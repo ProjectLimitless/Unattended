@@ -1,0 +1,45 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unattended", "Unattended\Unattended.csproj", "{7BD444E8-9302-4C1C-84BB-32EF85D98CC4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3F21487D-FA42-43B1-ABA5-13479951AD12}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unattended.Test", "Unattended.Test\Unattended.Test.csproj", "{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{3F09F4AF-76C0-4EE4-9099-5F7E70A91EEA}"
+	ProjectSection(SolutionItems) = preProject
+		scripts\RunTestsWithCoverage.bat = scripts\RunTestsWithCoverage.bat
+		scripts\RunTestsWithCoverageLocal.bat = scripts\RunTestsWithCoverageLocal.bat
+		scripts\SubmitCoverage.bat = scripts\SubmitCoverage.bat
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7BD444E8-9302-4C1C-84BB-32EF85D98CC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BD444E8-9302-4C1C-84BB-32EF85D98CC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BD444E8-9302-4C1C-84BB-32EF85D98CC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BD444E8-9302-4C1C-84BB-32EF85D98CC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3F09F4AF-76C0-4EE4-9099-5F7E70A91EEA} = {3F21487D-FA42-43B1-ABA5-13479951AD12}
+	EndGlobalSection
+EndGlobal
