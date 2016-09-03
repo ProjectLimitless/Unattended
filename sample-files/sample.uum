@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sample update manifest file -->
+<UpdateManifest>
+  <AppID>sample</AppID>
+  <ServerUri>http://unattended.projectlimitless.local</ServerUri>
+</UpdateManifest>

@@ -1,7 +1,4 @@
-﻿
-
-using Limitless.Unattended.Configuration;
-/** 
+﻿/** 
 * This file is part of Unattended.
 * Copyright © 2016 Donovan Solms.
 * Project Limitless
@@ -24,6 +21,7 @@ namespace Limitless.Unattended
     {
         static void Main(string[] args)
         {
+            // TODO: Log should be an interface and injected here
             Unattended runner = new Unattended();
             
             Console.WriteLine("Press <enter> to continue...");

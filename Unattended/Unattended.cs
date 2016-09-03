@@ -1,7 +1,4 @@
-﻿
-
-using Limitless.Unattended.Configuration;
-/** 
+﻿/** 
 * This file is part of Unattended.
 * Copyright © 2016 Donovan Solms.
 * Project Limitless
@@ -14,8 +11,13 @@ using Limitless.Unattended.Configuration;
 * Unattended. If not, see http://www.apache.org/licenses/LICENSE-2.0.
 */
 using NLog;
-using System.Configuration;
+using System;
 using System.IO;
+using System.Configuration;
+using System.Xml.Serialization;
+using System.Collections.Generic;
+using Limitless.Unattended.Structs;
+using Limitless.Unattended.Configuration;
 
 namespace Limitless.Unattended
 {
@@ -36,24 +38,31 @@ namespace Limitless.Unattended
         /// The configured and validated update interval.
         /// </summary>
         private string updateInterval;
+        /// <summary>
+        /// Collection of the updates to check at the interval.
+        /// </summary>
+        private List<UpdateManifest> updateManifests;
 
         /// <summary>
         /// Standard constructor.
         /// </summary>
         public Unattended()
         {
+            updateManifests = new List<UpdateManifest>();
+
             log = LogManager.GetCurrentClassLogger();
             log.Info("Reading Update configurations...");
             
             var settings = (UnattendedSection)(dynamic)ConfigurationManager.GetSection("unattended");
 
-            log.Info("Path to check for configs '{0}'", settings.ConfigurationDirectory);
+            string absoluteConfigPath = Path.GetFullPath(settings.ConfigurationDirectory);
+            log.Info("Path to check for configs '{0}'", absoluteConfigPath);
 
             // Validation checks
             // 1. Config directory
-            if (Directory.Exists(settings.ConfigurationDirectory) == false)
+            if (Directory.Exists(absoluteConfigPath) == false)
             {
-                log.Fatal("Configuration directory '{0}' does not exist or cannot be read from", settings.ConfigurationDirectory);
+                log.Fatal("Configuration directory '{0}' does not exist or cannot be read from", absoluteConfigPath);
                 //TODO: Add back - throw new IOException("Configuration directory does not exist or cannot be read from");
             }
 
@@ -72,7 +81,47 @@ namespace Limitless.Unattended
             }
             log.Info("Target application is '{0}'", Path.GetFileName(settings.Target.Path));
 
-            // Load / Parse configs            
+            // Load / Parse configs
+            string[] configFiles = Directory.GetFiles(absoluteConfigPath, "*.uum", SearchOption.AllDirectories);
+            foreach (string file in configFiles)
+            {
+                log.Debug("Check file '{0}'", Path.GetFileName(file));
+                UpdateManifest manifest = LoadUpdateManifest(file);
+                if (manifest != null)
+                {
+                    updateManifests.Add(manifest);
+                }
+            }
+            log.Info("Loaded {0} update manifest{1}", updateManifests.Count, (updateManifests.Count == 1 ? "" : "s"));
+        }
+
+        /// <summary>
+        /// Start the check and update loop.
+        /// </summary>
+        public void Run()
+        {
+            
+        }
+
+        /// <summary>
+        /// Loads and parses an update configuration manifest.
+        /// </summary>
+        /// <param name="path">The path to the manifest</param>
+        /// <returns>The parsed update manifest</returns>
+        private UpdateManifest LoadUpdateManifest(string path)
+        {
+            UpdateManifest manifest = null;
+            XmlSerializer parser = new XmlSerializer(typeof(UpdateManifest));
+            try
+            {
+                manifest = (UpdateManifest)parser.Deserialize(new StreamReader(path));
+            }
+            catch (Exception ex)
+            {
+                log.Fatal("Unable to parse update manifest '{0}': {1}", Path.GetFileName(path), ex.Message);
+                throw;
+            }
+            return manifest;
         }
 
         /// <summary>

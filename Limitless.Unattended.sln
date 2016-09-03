@@ -21,6 +21,16 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{3F09
 		scripts\SubmitCoverage.bat = scripts\SubmitCoverage.bat
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "protocol", "protocol", "{8D3475FB-4423-4E27-A745-121D9223C00E}"
+	ProjectSection(SolutionItems) = preProject
+		protocol\Protocol.md = protocol\Protocol.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sample-files", "sample-files", "{D72C692A-EB7D-423D-931A-9B00DF5990E0}"
+	ProjectSection(SolutionItems) = preProject
+		sample-files\sample.uum = sample-files\sample.uum
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,5 +51,7 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3F09F4AF-76C0-4EE4-9099-5F7E70A91EEA} = {3F21487D-FA42-43B1-ABA5-13479951AD12}
+		{8D3475FB-4423-4E27-A745-121D9223C00E} = {3F21487D-FA42-43B1-ABA5-13479951AD12}
+		{D72C692A-EB7D-423D-931A-9B00DF5990E0} = {3F21487D-FA42-43B1-ABA5-13479951AD12}
 	EndGlobalSection
 EndGlobal
