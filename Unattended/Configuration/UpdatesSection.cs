@@ -19,12 +19,26 @@ namespace Limitless.Unattended.Configuration
     public class UpdatesSection
     {
         /// <summary>
-        /// What to do when an update is ready.
+        /// What to do when an update is ready. Defaults to 'prompt'.
         /// </summary>
         public string Strategy { get; set; }
         /// <summary>
-        /// When to check for updates.
+        /// When to check for updates. Defaults to 'daily'.
         /// </summary>
         public string Interval { get; set; }
+        /// <summary>
+        /// The update channel to update against. Defaults to 'stable'.
+        /// </summary>
+        public string Channel { get; set; }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        public UpdatesSection()
+        {
+            Strategy = UpdateStrategies.Prompt;
+            Interval = UpdateIntervals.Daily;
+            Channel = "stable";
+        }
     }
 }

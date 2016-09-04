@@ -17,7 +17,11 @@ namespace Limitless.Unattended.Configuration
     /// Holds configuration information for unattended.
     /// </summary>
     public class UnattendedSection
-    {       
+    {
+        /// <summary>
+        /// The unique client ID for this installation.
+        /// </summary>
+        public string ClientID { get; set; }
         /// <summary>
         /// The directory to read multiple update configurations from.
         /// </summary>
@@ -30,5 +34,16 @@ namespace Limitless.Unattended.Configuration
         /// The application to manage and wrap around.
         /// </summary>
         public TargetSection Target{ get; set; }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        public UnattendedSection()
+        {
+            ClientID = "defaultclient";
+            ConfigurationDirectory = "configurations";
+            Target = new TargetSection();
+            Updates = new UpdatesSection();
+        }
     }
 }

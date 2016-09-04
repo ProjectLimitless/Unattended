@@ -29,6 +29,6 @@ namespace Limitless.Unattended.Structs
         /// <summary>
         /// The URI of the update server.
         /// </summary>
-        public string ServerUrl { get; set; }
+        public string ServerUri { get; set; }
     }
 }

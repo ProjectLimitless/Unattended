@@ -11,6 +11,8 @@
 * Unattended. If not, see http://www.apache.org/licenses/LICENSE-2.0.
 */
 using System;
+using System.Configuration;
+using Limitless.Unattended.Configuration;
 
 namespace Limitless.Unattended
 {
@@ -21,9 +23,11 @@ namespace Limitless.Unattended
     {
         static void Main(string[] args)
         {
-            // TODO: Log should be an interface and injected here
-            Unattended runner = new Unattended();
-            
+            UnattendedSection settings = (UnattendedSection)(dynamic)ConfigurationManager.GetSection("unattended");
+            Unattended runner = new Unattended(settings);
+
+            runner.Start();
+
             Console.WriteLine("Press <enter> to continue...");
             Console.ReadLine();            
         }

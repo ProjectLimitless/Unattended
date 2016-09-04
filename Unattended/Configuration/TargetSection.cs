@@ -26,5 +26,14 @@ namespace Limitless.Unattended.Configuration
         /// The parameters to pass to the application.
         /// </summary>
         public string Parameters { get; set; }
+
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
+        public TargetSection()
+        {
+            Path = "App.exe";
+            Parameters = "";
+        }
     }
 }

@@ -31,6 +31,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sample-files", "sample-file
 		sample-files\sample.uum = sample-files\sample.uum
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleApplication", "SampleApplication\SampleApplication.csproj", "{711397AF-40FA-45BB-8521-2AD6EA3F7C57}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{711397AF-40FA-45BB-8521-2AD6EA3F7C57}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{711397AF-40FA-45BB-8521-2AD6EA3F7C57}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{711397AF-40FA-45BB-8521-2AD6EA3F7C57}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{711397AF-40FA-45BB-8521-2AD6EA3F7C57}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
