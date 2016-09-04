@@ -10,20 +10,27 @@
 * You should have received a copy of the Apache License Version 2.0 with
 * Unattended. If not, see http://www.apache.org/licenses/LICENSE-2.0.
 */
-using Limitless.ioRPC;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace SampleApplication
 {
     /// <summary>
-    /// A simple sample program for showing how the Unattended updater works.
+    /// Sample handler for the update.
     /// </summary>
-    class Program
+    public class UpdateHandler
     {
-        static void Main(string[] args)
+        public bool CanUpdate()
         {
-            UpdateHandler handler = new UpdateHandler();
-            Client client = new Client(handler);
-            client.Listen();
+            return true;
+        }
+
+        public void Exit()
+        {
+            Environment.Exit(0);
         }
     }
 }

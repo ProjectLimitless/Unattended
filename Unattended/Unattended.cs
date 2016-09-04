@@ -10,16 +10,22 @@
 * You should have received a copy of the Apache License Version 2.0 with
 * Unattended. If not, see http://www.apache.org/licenses/LICENSE-2.0.
 */
-using NLog;
 using System;
 using System.IO;
+using System.Net;
+using System.Reflection;
+using System.Diagnostics;
 using System.Xml.Serialization;
 using System.Collections.Generic;
+
+using NLog;
+using Limitless.ioRPC;
+using Limitless.Unattended.Enums;
 using Limitless.Unattended.Structs;
 using Limitless.Unattended.Configuration;
-using System.Reflection;
-using System.Net;
-using Limitless.Unattended.Enums;
+using Limitless.ioRPC.Structs;
+using System.Threading;
+using System.Text;
 
 namespace Limitless.Unattended
 {
@@ -45,9 +51,21 @@ namespace Limitless.Unattended
         /// </summary>
         private string updateInterval;
         /// <summary>
+        /// Absolute path to the target application.
+        /// </summary>
+        private string applicationPath;
+        /// <summary>
+        /// Parameters to pass to the target application.
+        /// </summary>
+        private string applicationParameters;
+        /// <summary>
         /// Collection of the updates to check at the interval.
         /// </summary>
         private List<UpdateManifest> updateManifests;
+        /// <summary>
+        /// ioRPC server instance.
+        /// </summary>
+        private Server ioServer;
 
         /// <summary>
         /// Default constructor.
@@ -98,14 +116,19 @@ namespace Limitless.Unattended
             updateInterval = getValidUpdateInterval(settings.Updates.Interval);
             log.Info("Update interval set as '{0}'", updateInterval);
 
-            string absoluteAppPath = Path.GetFullPath(settings.Target.Path);
+            applicationPath = Path.GetFullPath(settings.Target.Path);
             // 4. Check if the target application exists
-            if (File.Exists(absoluteAppPath) == false)
+            if (File.Exists(applicationPath) == false)
             {
-                log.Fatal("Target application '{0}' does not exist or cannot be read from", absoluteAppPath);
-                throw new IOException("Target application does not exist or cannot be read from: " + absoluteAppPath);
+                log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
+                throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
             }
-            log.Info("Target application is '{0}'", Path.GetFileName(absoluteAppPath));
+            log.Info("Target application is '{0}'", Path.GetFileName(applicationPath));
+            applicationParameters = "";
+            if (settings.Target.Parameters != null)
+            {
+                applicationParameters = settings.Target.Parameters;
+            }
 
             // Load / Parse configs
             string[] configFiles = Directory.GetFiles(absoluteConfigPath, "*.uum", SearchOption.AllDirectories);
@@ -128,8 +151,21 @@ namespace Limitless.Unattended
         {
             // Launch the application and attach the ioRPC
             log.Info("Starting target application...");
+            // Setup parameters for ioRPC
+            ProcessStartInfo processInfo = new ProcessStartInfo();
+            processInfo.FileName = applicationPath;
+            processInfo.Arguments = applicationParameters;
 
+            ioServer = new Server(processInfo);
+            // Add event handlers
+            ioServer.CommandResultReceived += IoServer_CommandResultReceived;
+            ioServer.CommandExceptionReceived += IoServer_CommandExceptionReceived;
+            ioServer.Exited += IoServer_Exited;
+            // Start the server
+            ioServer.Start();
+            
             // Set the update check time
+            // TODO: This should move and be handled in the loop?
             if (updateInterval == UpdateIntervals.Startup)
             {
                 log.Info("Application started, check for updates...");
@@ -139,6 +175,29 @@ namespace Limitless.Unattended
             {
                 log.Info("Daily interval set for one hour from now...");
             }
+
+            // Run the loop
+            Run();
+        }
+
+        /// <summary>
+        /// Main application loop.
+        /// </summary>
+        private void Run()
+        {
+            log.Info("Start main loop...");
+            while (Console.KeyAvailable == false)
+            {
+                log.Debug("Loop update");
+                Thread.Sleep(1000);
+            }
+            // Send exit command
+            ioCommand exitCommand = new ioCommand("Exit");
+            ioServer.Execute(exitCommand);
+
+            // Wait 5s then kill
+            ioServer.ExitAndWait(5000);
+            ioServer.Dispose();
         }
 
         /// <summary>
@@ -162,10 +221,6 @@ namespace Limitless.Unattended
             log.Debug("Checking update for application '{0}' at '{1}'", updateManifest.AppID, updateManifest.ServerUri);
 
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            WebRequest webRequest = WebRequest.Create(updateManifest.ServerUri);
-            ((HttpWebRequest)webRequest).Method = "POST";
-            ((HttpWebRequest)webRequest).UserAgent = string.Format("Limitless Unattended ({0})", version);
-
             // Create the data to send to the server
             OmahaRequest request = new OmahaRequest();
             request.Application.ClientID = clientId;
@@ -175,37 +230,30 @@ namespace Limitless.Unattended
             request.Application.Event.EventResult = OmahaEventResultTypes.Started;
 
             XmlSerializer serializer = new XmlSerializer(request.GetType());
-            string serializedRequest = "";
-            using (StringWriter textWriter = new StringWriter())
+            byte[] serializedRequest;
+            using (MemoryStream memoryStream = new MemoryStream())
             {
-                serializer.Serialize(textWriter, request);
-                serializedRequest = textWriter.ToString();
+                serializer.Serialize(memoryStream, request);
+                serializedRequest = memoryStream.ToArray();
             }
-            Console.WriteLine(serializedRequest);
+            using (var client = new WebClient())
+            {
+                client.Headers.Add("User-Agent", string.Format("Limitless Unattended ({0})", version));
+                try
+                {
+                    var response = client.UploadData(updateManifest.ServerUri, serializedRequest);
+
+                    string responseString = Encoding.Default.GetString(response);
+                    log.Debug("Response from update server: {0}", responseString);
+                }
+                catch (Exception ex)
+                {
+                    // TODO: Handle
+                }
+                
+            }
 
             /*
-            string remoteManifestData = "";
-            log.Debug("Fetching remote manifest data...");
-            try
-            {
-                WebResponse response = request.GetResponse();
-                HttpStatusCode statusCode = ((HttpWebResponse)response).StatusCode;
-                log.Debug("Got response from Uri: {0}", statusCode.ToString());
-                if (statusCode == HttpStatusCode.OK)
-                {
-                    Stream dataStream = response.GetResponseStream();
-                    StreamReader reader = new StreamReader(dataStream);
-                    remoteManifestData = reader.ReadToEnd();
-                    reader.Close();
-                }
-                response.Close();
-            }
-            catch (WebException ex)
-            {
-                log.Error("Unable to fetch remote manifest at {0}: {1}", manifest.Uri, ex.Message);
-                return false;
-            }
-
             // Parse the remote manifest
             RemoteManifest remoteManifest;
             XmlSerializer parser = new XmlSerializer(typeof(RemoteManifest));
@@ -330,5 +378,22 @@ namespace Limitless.Unattended
             }
             return interval;
         }
+
+        #region Event Handlers
+        private void IoServer_Exited(object sender, EventArgs e)
+        {
+            log.Info("ioRPC - Client exited");
+        }
+
+        private void IoServer_CommandExceptionReceived(object sender, ioRPC.Events.ioEventArgs e)
+        {
+            log.Info("ioRPC - Client Exception: '{0} - {1}'", e.CommandName, e.ExceptionMessage);
+        }
+
+        private void IoServer_CommandResultReceived(object sender, ioRPC.Events.ioEventArgs e)
+        {
+            log.Info("ioRPC - Client Result: '{0} - {1}'", e.CommandName, e.Data);
+        }
+        #endregion
     }
 }
