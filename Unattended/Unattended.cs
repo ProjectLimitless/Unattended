@@ -231,18 +231,21 @@ namespace Limitless.Unattended
 
             XmlSerializer serializer = new XmlSerializer(request.GetType());
             byte[] serializedRequest;
+            // TODO: Clean up the two usings
             using (MemoryStream memoryStream = new MemoryStream())
             {
                 serializer.Serialize(memoryStream, request);
                 serializedRequest = memoryStream.ToArray();
             }
+            
             using (var client = new WebClient())
             {
                 client.Headers.Add("User-Agent", string.Format("Limitless Unattended ({0})", version));
                 try
                 {
-                    var response = client.UploadData(updateManifest.ServerUri, serializedRequest);
-
+                    log.Debug("Data to be sent to update server: {0}", Encoding.UTF8.GetString(serializedRequest));
+                    var response = client.UploadData(updateManifest.ServerUri, "POST", serializedRequest);
+                    
                     string responseString = Encoding.Default.GetString(response);
                     log.Debug("Response from update server: {0}", responseString);
                 }
@@ -250,7 +253,6 @@ namespace Limitless.Unattended
                 {
                     // TODO: Handle
                 }
-                
             }
 
             /*

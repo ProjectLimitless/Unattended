@@ -2,5 +2,5 @@
 <!-- Sample update manifest file -->
 <UpdateManifest>
   <AppID>sample</AppID>
-  <ServerUri>http://unattended.projectlimitless.local</ServerUri>
+  <ServerUri>http://unattendedserver.local</ServerUri>
 </UpdateManifest>
