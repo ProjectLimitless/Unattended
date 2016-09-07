@@ -248,64 +248,44 @@ namespace Limitless.Unattended
                     
                     string responseString = Encoding.Default.GetString(response);
                     log.Debug("Response from update server: {0}", responseString);
+
+                    OmahaResponse omahaResponse = null;
+                    XmlSerializer parser = new XmlSerializer(typeof(OmahaResponse));
+                    try
+                    {
+                        omahaResponse = (OmahaResponse)parser.Deserialize(new StringReader(responseString));
+                        if (omahaResponse.Application.Status == "ok")
+                        {
+                            if (omahaResponse.Application.UpdateCheck.Status == "ok")
+                            {
+                                //TODO: Return info to process the update
+                                log.Info("Update available for {0}. Version {1} ({2})", omahaResponse.Application.ID, omahaResponse.Application.UpdateCheck.Manifest.Version, omahaResponse.Application.TraceID);
+                                return true;
+                            }
+                            else if (omahaResponse.Application.UpdateCheck.Status == "noupdate")
+                            {
+                                log.Debug("No update available yet for {0}. At version {1}", request.Application.ID, request.Application.Version);
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            log.Warn("The update server responded with App Status {0}: '{1}'", omahaResponse.Application.Status, omahaResponse.Application.Reason);
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Warn("Unable to parse Omaha response for application '{0}': {1}", request.Application.ID, ex.Message);
+                        return false;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // TODO: Handle
+                    log.Warn("Unable to check updates for application {0}: '{1}'", request.Application.ID, ex.Message);
+                    return false;
                 }
             }
-
-            /*
-            // Parse the remote manifest
-            RemoteManifest remoteManifest;
-            XmlSerializer parser = new XmlSerializer(typeof(RemoteManifest));
-            try
-            {
-                remoteManifest = (RemoteManifest)parser.Deserialize(new StringReader(remoteManifestData));
-            }
-            catch (Exception ex)
-            {
-                log.Error("Unable to parse remote manifest: '{0}'", ex.Message);
-                return false;
-            }
-            // Check the manifest
-            if (remoteManifest == null)
-            {
-                log.Error("The remote manifest is null: '{0}'", manifest.Name);
-                return false;
-            }
-            if (remoteManifest.Name == string.Empty)
-            {
-                log.Warn("The remote manifest does not contain the file name: '{0}'", manifest.Name);
-                return false;
-            }
-
-
-            // Check if update is required
-            switch (manifest.Policy)
-            {
-                case Policy.FileVersion:
-                    // Get the current file version.
-                    Version currentVersion = AssemblyName.GetAssemblyName(manifest.File).Version;
-                    log.Debug("Current file version is {0}", currentVersion.ToString());
-                    Version remoteVersion;
-                    if (Version.TryParse(remoteManifest.Version, out remoteVersion))
-                    {
-                        log.Debug("Parsed remote manifest version as {0}", remoteVersion);
-                        if (currentVersion.CompareTo(remoteVersion) < 0)
-                        {
-                            log.Info("'{0}' requires an update, remote version is newer.", Path.GetFileName(manifest.File));
-                            updateInfo = new KeyValuePair<Manifest, RemoteManifest>(manifest, remoteManifest);
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        log.Warn("Unable to parse remote manifest version '{0}'", remoteManifest.Version);
-                    }
-                    break;
-            }
-            */
             return false;
         }
 

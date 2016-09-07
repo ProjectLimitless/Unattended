@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Sample update manifest file -->
 <UpdateManifest>
-  <AppID>sample</AppID>
+  <AppID>limitless.core</AppID>
   <ServerUri>http://unattendedserver.local</ServerUri>
 </UpdateManifest>

@@ -27,6 +27,11 @@ namespace Limitless.Unattended.Structs
         [XmlAttribute("appid")]
         public string ID { get; set; }
         /// <summary>
+        /// Response status
+        /// </summary>
+        [XmlAttribute("status")]
+        public string Status { get; set; }
+        /// <summary>
         /// The symver version of the application.
         /// </summary>
         [XmlAttribute("version")]
@@ -42,11 +47,25 @@ namespace Limitless.Unattended.Structs
         [XmlAttribute("bootid")]
         public string ClientID { get; set; }
         /// <summary>
-        /// 
+        /// The unique trace for this response and following requests.
+        /// </summary>
+        [XmlAttribute("trace")]
+        public string TraceID { get; set; }
+        /// <summary>
+        /// The event being sent to the server.
         /// </summary>
         [XmlElement("event")]
         public OmahaEvent Event { get; set; }
-
+        /// <summary>
+        /// Response for update events.
+        /// </summary>
+        [XmlElement("updatecheck")]
+        public OmahaUpdateCheck UpdateCheck { get; set; }
+        /// <summary>
+        /// Response - The reason for failure if status is not ok.
+        /// </summary>
+        [XmlElement("reason")]
+        public string Reason { get; set; }
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -54,6 +73,15 @@ namespace Limitless.Unattended.Structs
         {
             Channel = "stable";
             Event = new OmahaEvent();
-        }       
+        }
+
+        #region ShouldSerialize
+        public bool ShouldSerializeStatus()
+        {
+            if (Status == null)
+                return false;
+            return Status.Trim().Length > 0;
+        }
+        #endregion
     }
 }
