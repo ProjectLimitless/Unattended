@@ -47,11 +47,6 @@ namespace Limitless.Unattended.Structs
         [XmlAttribute("bootid")]
         public string ClientID { get; set; }
         /// <summary>
-        /// The unique trace for this response and following requests.
-        /// </summary>
-        [XmlAttribute("trace")]
-        public string TraceID { get; set; }
-        /// <summary>
         /// The event being sent to the server.
         /// </summary>
         [XmlElement("event")]

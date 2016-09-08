@@ -27,6 +27,11 @@ namespace Limitless.Unattended.Structs
         [XmlAttribute("version")]
         public string Version { get; set; }
         /// <summary>
+        /// The unique trace for this response and following update requests.
+        /// </summary>
+        [XmlAttribute("trace")]
+        public string TraceID { get; set; }
+        /// <summary>
         /// The url to download from.
         /// </summary>
         [XmlElement("url")]

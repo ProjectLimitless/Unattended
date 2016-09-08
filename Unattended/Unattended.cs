@@ -163,18 +163,26 @@ namespace Limitless.Unattended
             ioServer.Exited += IoServer_Exited;
             // Start the server
             ioServer.Start();
-            
+
             // Set the update check time
             // TODO: This should move and be handled in the loop?
+            List<OmahaManifest> omahaManifests;
             if (updateInterval == UpdateIntervals.Startup)
             {
                 log.Info("Application started, check for updates...");
-                CheckUpdates();
+                omahaManifests = CheckUpdates();
+                if (omahaManifests.Count > 0)
+                {
+                    log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
+                }
             }
             else if (updateInterval == UpdateIntervals.Daily)
             {
                 log.Info("Daily interval set for one hour from now...");
             }
+
+            //TODO: Create the secondary path / backup to the alternate path?
+            //TODO: Process the list of updates
 
             // Run the loop
             Run();
@@ -203,21 +211,32 @@ namespace Limitless.Unattended
         /// <summary>
         /// Check for updates for the configured pieces.
         /// </summary>
-        private void CheckUpdates()
+        /// <returns>A list of OmahaManifest's that require updates</returns>
+        private List<OmahaManifest> CheckUpdates()
         {
             log.Info("Checking for updates...");
+            List<OmahaManifest> omahaManifests = new List<OmahaManifest>();
             foreach (UpdateManifest updateManifest in updateManifests)
             {
-                CheckUpdate(updateManifest);
+                OmahaManifest omahaManifest;
+                if (UpdateAvailable(updateManifest, out omahaManifest) == true)
+                {
+                    log.Info("Update available for {0}. Version {1} ({2})", updateManifest.AppID, omahaManifest.Version, omahaManifest.TraceID);
+                    omahaManifests.Add(omahaManifest);
+                }
             }
+            return omahaManifests;
         }
 
         /// <summary>
-        /// Checks if a manifest requires and update.
+        /// Checks if a manifest requires an update.
         /// </summary>
         /// <param name="updateManifest">The manifest to check</param>
-        private bool CheckUpdate(UpdateManifest updateManifest)
+        /// <param name="omahaManifest">The Omaha update manifest, if result if true</param>
+        /// <returns>true if the given updateManifest requires an update</returns>
+        private bool UpdateAvailable(UpdateManifest updateManifest, out OmahaManifest omahaManifest)
         {
+            omahaManifest = null;
             log.Debug("Checking update for application '{0}' at '{1}'", updateManifest.AppID, updateManifest.ServerUri);
 
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
@@ -258,8 +277,7 @@ namespace Limitless.Unattended
                         {
                             if (omahaResponse.Application.UpdateCheck.Status == "ok")
                             {
-                                //TODO: Return info to process the update
-                                log.Info("Update available for {0}. Version {1} ({2})", omahaResponse.Application.ID, omahaResponse.Application.UpdateCheck.Manifest.Version, omahaResponse.Application.TraceID);
+                                omahaManifest = omahaResponse.Application.UpdateCheck.Manifest;
                                 return true;
                             }
                             else if (omahaResponse.Application.UpdateCheck.Status == "noupdate")
