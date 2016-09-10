@@ -51,9 +51,13 @@ namespace Limitless.Unattended
         /// </summary>
         private string updateInterval;
         /// <summary>
-        /// Absolute path to the target application.
+        /// Absolute path to the target application's root path.
         /// </summary>
-        private string applicationPath;
+        private string basePath;
+        /// <summary>
+        /// The name of the target application.
+        /// </summary>
+        private string applicationFilename;
         /// <summary>
         /// Parameters to pass to the target application.
         /// </summary>
@@ -116,14 +120,37 @@ namespace Limitless.Unattended
             updateInterval = getValidUpdateInterval(settings.Updates.Interval);
             log.Info("Update interval set as '{0}'", updateInterval);
 
-            applicationPath = Path.GetFullPath(settings.Target.Path);
-            // 4. Check if the target application exists
-            if (File.Exists(applicationPath) == false)
+            // 4. Check base path
+            basePath = Path.GetFullPath(settings.Target.BasePath);
+            if (Directory.Exists(basePath) == false)
+            {
+                log.Fatal("Application root directory does not exist at '{0}'", basePath);
+                throw new IOException("Application root directory does not exist at " + basePath);
+            }
+
+            // 5. Determine the latest version of the application
+            log.Debug("Getting available directories in basepath '{0}'", basePath);
+            string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
+            foreach (string applicationDirectory in applicationDirectories)
+            {
+                log.Debug("Directory in application root path: '{0}'", applicationDirectory);
+
+                // Check if the path conforms to the date.counter format
+                // TODO: Continue here
+            }
+
+
+
+            /*
+            // 5. Check if the target application exists
+            if (Directory.Exists(basePath) == false)
             {
                 log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
                 throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
             }
             log.Info("Target application is '{0}'", Path.GetFileName(applicationPath));
+            */
+
             applicationParameters = "";
             if (settings.Target.Parameters != null)
             {
@@ -152,7 +179,7 @@ namespace Limitless.Unattended
             // Launch the application and attach the ioRPC
             log.Info("Starting target application...");
             // Setup parameters for ioRPC
-            ProcessStartInfo processInfo = new ProcessStartInfo();
+            /*ProcessStartInfo processInfo = new ProcessStartInfo();
             processInfo.FileName = applicationPath;
             processInfo.Arguments = applicationParameters;
 
@@ -185,7 +212,7 @@ namespace Limitless.Unattended
             //TODO: Process the list of updates
 
             // Run the loop
-            Run();
+            Run();*/
         }
 
         /// <summary>
