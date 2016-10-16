@@ -56,9 +56,9 @@ namespace Limitless.Unattended
         /// </summary>
         private string basePath;
         /// <summary>
-        /// The name of the target application.
+        /// The target application.
         /// </summary>
-        private string applicationFilename;
+        private string applicationPath;
         /// <summary>
         /// Parameters to pass to the target application.
         /// </summary>
@@ -136,79 +136,20 @@ namespace Limitless.Unattended
             }
 
             // 5. Determine the latest version of the application
-            KeyValuePair<DateTime, int> latestVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);
             log.Debug("Getting available directories in basepath '{0}'", basePath);
             string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
-            foreach (string applicationDirectory in applicationDirectories)
-            {
-                log.Debug("Directory in application root path: '{0}'", applicationDirectory);
-                string directoryName = applicationDirectory.Substring(applicationDirectory.LastIndexOf(Path.DirectorySeparatorChar));
-                directoryName = directoryName.Replace(Path.DirectorySeparatorChar.ToString(), "");
+            string latestVersionDirectory = getLatestVersionDirectory(applicationDirectories);
+            log.Info("Latest version directory is '{0}'", latestVersionDirectory);
 
-                // Check if the path conforms to the date.counter format
-                // but first, check if there is a '.' for date.counter format
-                // The actual format is 20161231.1
-                if (directoryName.Contains(".") == true)
-                {
-                    // parts[0] should be the date and parts[1] should be the counter
-                    string[] parts = directoryName.Split('.');
-                    if (parts.Length == 2)
-                    {
-                        DateTime datePart;
-                        bool dateParsed = DateTime.TryParseExact(
-                            parts[0],
-                            applicationPathDateFormat, 
-                            CultureInfo.InvariantCulture, 
-                            DateTimeStyles.None, 
-                            out datePart);
-                        if (dateParsed == true)
-                        {
-                            log.Debug(" Path has date set as: '{0}'", datePart.ToString("yyyy-MM-dd"));
-                            // Check if parts[1] is a counter value
-                            int counter;
-                            bool counterParsed = Int32.TryParse(parts[1], out counter);
-                            if (counterParsed == true)
-                            {
-                                log.Debug(" Path has counter value of: '{0}'", counter);
-
-                                if (datePart > latestVersion.Key)
-                                {
-                                    latestVersion = new KeyValuePair<DateTime, int>(datePart, counter);
-                                } 
-                                else if (datePart == latestVersion.Key)
-                                {
-                                    if (counter > latestVersion.Value)
-                                    {
-                                        // Dates are the same, check counter
-                                        latestVersion = new KeyValuePair<DateTime, int>(datePart, counter);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if (latestVersion.Key == DateTime.MinValue)
-            {
-                // No versions found
-                log.Fatal("No available version directory found.");
-                throw new NotSupportedException("No available version directory found");
-            }
-            log.Info("Latest version is '{0}.{1}'", latestVersion.Key.ToString(applicationPathDateFormat), latestVersion.Value);
-
-            //
-
-
-            /*
-            // 5. Check if the target application exists
-            if (Directory.Exists(basePath) == false)
+            // 6. Check if the target application exists in the latest verion path
+            applicationPath = latestVersionDirectory + Path.DirectorySeparatorChar + settings.Target.Filename;
+            log.Info("Target application is at '{0}'", applicationPath);
+            if (File.Exists(applicationPath) == false)
             {
                 log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
                 throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
             }
-            log.Info("Target application is '{0}'", Path.GetFileName(applicationPath));
-            */
-
+            
             applicationParameters = "";
             if (settings.Target.Parameters != null)
             {
@@ -237,7 +178,7 @@ namespace Limitless.Unattended
             // Launch the application and attach the ioRPC
             log.Info("Starting target application...");
             // Setup parameters for ioRPC
-            /*ProcessStartInfo processInfo = new ProcessStartInfo();
+            ProcessStartInfo processInfo = new ProcessStartInfo();
             processInfo.FileName = applicationPath;
             processInfo.Arguments = applicationParameters;
 
@@ -270,7 +211,7 @@ namespace Limitless.Unattended
             //TODO: Process the list of updates
 
             // Run the loop
-            Run();*/
+            Run();
         }
 
         /// <summary>
@@ -462,6 +403,76 @@ namespace Limitless.Unattended
                     break;
             }
             return interval;
+        }
+
+        /// <summary>
+        /// Get's the latest version application path from the list of given directories.
+        /// </summary>
+        /// <param name="applicationDirectories">The list of available application paths</param>
+        /// <returns>The latest version path</returns>
+        private string getLatestVersionDirectory(string[] applicationDirectories)
+        {
+            string latestVersionDirectory = "";
+            KeyValuePair<DateTime, int> latestVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);            
+            foreach (string applicationDirectory in applicationDirectories)
+            {
+                log.Debug("Directory in application root path: '{0}'", applicationDirectory);
+                string directoryName = applicationDirectory.Substring(applicationDirectory.LastIndexOf(Path.DirectorySeparatorChar));
+                directoryName = directoryName.Replace(Path.DirectorySeparatorChar.ToString(), "");
+
+                // Check if the path conforms to the date.counter format
+                // but first, check if there is a '.' for date.counter format
+                // The actual format is 20161231.1
+                if (directoryName.Contains(".") == true)
+                {
+                    // parts[0] should be the date and parts[1] should be the counter
+                    string[] parts = directoryName.Split('.');
+                    if (parts.Length == 2)
+                    {
+                        DateTime datePart;
+                        bool dateParsed = DateTime.TryParseExact(
+                            parts[0],
+                            applicationPathDateFormat,
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.None,
+                            out datePart);
+                        if (dateParsed == true)
+                        {
+                            log.Debug(" Path has date set as: '{0}'", datePart.ToString("yyyy-MM-dd"));
+                            // Check if parts[1] is a counter value
+                            int counter;
+                            bool counterParsed = Int32.TryParse(parts[1], out counter);
+                            if (counterParsed == true)
+                            {
+                                log.Debug(" Path has counter value of: '{0}'", counter);
+
+                                if (datePart > latestVersion.Key)
+                                {
+                                    latestVersion = new KeyValuePair<DateTime, int>(datePart, counter);
+                                    latestVersionDirectory = applicationDirectory;
+                                }
+                                else if (datePart == latestVersion.Key)
+                                {
+                                    if (counter > latestVersion.Value)
+                                    {
+                                        // Dates are the same, check counter
+                                        latestVersion = new KeyValuePair<DateTime, int>(datePart, counter);
+                                        latestVersionDirectory = applicationDirectory;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (latestVersion.Key == DateTime.MinValue)
+            {
+                // No versions found
+                log.Fatal("No available version directory found.");
+                throw new NotSupportedException("No available version directory found");
+            }
+            log.Info("Latest version is '{0}.{1}'", latestVersion.Key.ToString(applicationPathDateFormat), latestVersion.Value);
+            return latestVersionDirectory;
         }
 
         #region Event Handlers
