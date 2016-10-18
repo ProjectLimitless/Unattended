@@ -36,6 +36,11 @@ namespace Limitless.Unattended
     public class Unattended
     {
         /// <summary>
+        /// Lock for syncing.
+        /// </summary>
+        private static readonly object syncLock = new object();
+
+        /// <summary>
         /// NLog logger.
         /// </summary>
         private Logger log;
@@ -51,6 +56,10 @@ namespace Limitless.Unattended
         /// The configured and validated update interval.
         /// </summary>
         private string updateInterval;
+        /// <summary>
+        /// Flag to check if we are currently in update state.
+        /// </summary>
+        private volatile bool isUpdating;
         /// <summary>
         /// Absolute path to the target application's root path.
         /// </summary>
@@ -120,11 +129,11 @@ namespace Limitless.Unattended
             }
 
             // 2. Validate the strategy
-            updateStrategy = getValidUpdateStrategy(settings.Updates.Strategy);
+            updateStrategy = GetValidUpdateStrategy(settings.Updates.Strategy);
             log.Info("Update strategy set as '{0}'", updateStrategy);
             
             // 3. Validate the interval
-            updateInterval = getValidUpdateInterval(settings.Updates.Interval);
+            updateInterval = GetValidUpdateInterval(settings.Updates.Interval);
             log.Info("Update interval set as '{0}'", updateInterval);
 
             // 4. Check base path
@@ -138,7 +147,7 @@ namespace Limitless.Unattended
             // 5. Determine the latest version of the application
             log.Debug("Getting available directories in basepath '{0}'", basePath);
             string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
-            string latestVersionDirectory = getLatestVersionDirectory(applicationDirectories);
+            string latestVersionDirectory = GetLatestVersionDirectory(applicationDirectories);
             log.Info("Latest version directory is '{0}'", latestVersionDirectory);
 
             // 6. Check if the target application exists in the latest verion path
@@ -190,25 +199,21 @@ namespace Limitless.Unattended
             // Start the server
             ioServer.Start();
 
-            // Set the update check time
-            // TODO: This should move and be handled in the loop?
-            List<OmahaManifest> omahaManifests;
-            if (updateInterval == UpdateIntervals.Startup)
+            // Always check for updates on startup
+            ProcessUpdates();
+
+            // Schedule the next update check time
+            if (updateInterval == UpdateIntervals.Daily)
             {
-                log.Info("Application started, check for updates...");
-                omahaManifests = CheckUpdates();
-                if (omahaManifests.Count > 0)
-                {
-                    log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
-                }
-            }
-            else if (updateInterval == UpdateIntervals.Daily)
-            {
-                log.Info("Daily interval set for one hour from now...");
+                //PeriodicTask.Run(ProcessUpdates, TimeSpan.FromDays(1));
+                PeriodicTask.Run(ProcessUpdates, TimeSpan.FromSeconds(2));
+                log.Info("Task created to check for updates");
             }
 
+
             //TODO: Create the secondary path / backup to the alternate path?
-            //TODO: Process the list of updates
+
+            
 
             // Run the loop
             Run();
@@ -230,15 +235,59 @@ namespace Limitless.Unattended
             ioServer.Execute(exitCommand);
 
             // Wait 5s then kill
-            ioServer.ExitAndWait(5000);
+            ioServer.ExitAndWait(5 * 1000);
             ioServer.Dispose();
         }
-
+        
         /// <summary>
-        /// Check for updates for the configured pieces.
+        /// Check for updates, download and apply them if available
+        /// </summary>
+        private void ProcessUpdates()
+        {
+            // Not really needed as the task waits for the previous one
+            // to complete before firing the delay. But rather be safe.
+            lock (syncLock)
+            {
+                if (isUpdating == false)
+                {
+                    isUpdating = true;
+
+                    List<OmahaManifest> omahaManifests;
+                    omahaManifests = GetAvailableUpdates();
+                    if (omahaManifests.Count > 0)
+                    {
+                        log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
+
+                        // Download the updates
+                        foreach (OmahaManifest manifest in omahaManifests)
+                        {
+                            log.Info("Downloading update for {0} (Size {1} MB)", manifest.Package.Name, ((double)(manifest.Package.SizeInBytes)/1024.00/1024.00).ToString("F5"));
+
+                            continue WITH THE DOWNLOADER
+                        }
+
+                        isUpdating = false;
+                    }
+                    else
+                    {
+                        log.Debug("No updates are available at this time");
+                        isUpdating = false;
+                    }
+                }
+                else
+                {
+                    // Do nothing
+                    log.Trace("Update is already in progress");
+                    return;
+                }    
+            }
+        }
+        
+        /// <summary>
+        /// Check for updates for the configured modules.
         /// </summary>
         /// <returns>A list of OmahaManifest's that require updates</returns>
-        private List<OmahaManifest> CheckUpdates()
+        private List<OmahaManifest> GetAvailableUpdates()
         {
             log.Info("Checking for updates...");
             List<OmahaManifest> omahaManifests = new List<OmahaManifest>();
@@ -271,8 +320,8 @@ namespace Limitless.Unattended
             request.Application.ClientID = clientId;
             request.Application.ID = updateManifest.AppID;
             request.Application.Version = version;
-            request.Application.Event.EventType = OmahaEventTypes.UpdateCheck;
-            request.Application.Event.EventResult = OmahaEventResultTypes.Started;
+            request.Application.Event.EventType = OmahaEventType.UpdateCheck;
+            request.Application.Event.EventResult = OmahaEventResultType.Started;
 
             XmlSerializer serializer = new XmlSerializer(request.GetType());
             byte[] serializedRequest;
@@ -288,11 +337,11 @@ namespace Limitless.Unattended
                 client.Headers.Add("User-Agent", string.Format("Limitless Unattended ({0})", version));
                 try
                 {
-                    log.Debug("Data to be sent to update server: {0}", Encoding.UTF8.GetString(serializedRequest));
+                    //log.Debug("Data to be sent to update server: {0}", Encoding.UTF8.GetString(serializedRequest));
                     var response = client.UploadData(updateManifest.ServerUri, "POST", serializedRequest);
                     
                     string responseString = Encoding.Default.GetString(response);
-                    log.Debug("Response from update server: {0}", responseString);
+                    //log.Debug("Response from update server: {0}", responseString);
 
                     OmahaResponse omahaResponse = null;
                     XmlSerializer parser = new XmlSerializer(typeof(OmahaResponse));
@@ -359,7 +408,7 @@ namespace Limitless.Unattended
         /// </summary>
         /// <param name="checkStrategy">The desired strategy</param>
         /// <returns>checkStrategy if valid, the default 'restart' otherwise</returns>
-        private string getValidUpdateStrategy(string checkStrategy)
+        private string GetValidUpdateStrategy(string checkStrategy)
         {
             string strategy = "";
             switch (checkStrategy.ToLower())
@@ -386,14 +435,11 @@ namespace Limitless.Unattended
         /// </summary>
         /// <param name="checkInterval">The desired interval</param>
         /// <returns>checkInterval if valid, the default 'daily' otherwise</returns>
-        private string getValidUpdateInterval(string checkInterval)
+        private string GetValidUpdateInterval(string checkInterval)
         {
             string interval = "";
             switch (checkInterval.ToLower())
             {
-                case UpdateIntervals.Startup:
-                    interval = UpdateIntervals.Startup;
-                    break;
                 case UpdateIntervals.Daily:
                     interval = UpdateIntervals.Daily;
                     break;
@@ -410,7 +456,7 @@ namespace Limitless.Unattended
         /// </summary>
         /// <param name="applicationDirectories">The list of available application paths</param>
         /// <returns>The latest version path</returns>
-        private string getLatestVersionDirectory(string[] applicationDirectories)
+        private string GetLatestVersionDirectory(string[] applicationDirectories)
         {
             string latestVersionDirectory = "";
             KeyValuePair<DateTime, int> latestVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);            

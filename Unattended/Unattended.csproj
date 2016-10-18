@@ -63,8 +63,9 @@
     <Compile Include="Configuration\UpdatesSection.cs" />
     <Compile Include="Configuration\UpdateIntervals.cs" />
     <Compile Include="Configuration\UpdateStrategies.cs" />
-    <Compile Include="Enums\OmahaEventResultTypes.cs" />
-    <Compile Include="Enums\OmahaEventTypes.cs" />
+    <Compile Include="Enums\OmahaEventResultType.cs" />
+    <Compile Include="Enums\OmahaEventType.cs" />
+    <Compile Include="PeriodicTask.cs" />
     <Compile Include="ServiceDaemon.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Structs\OmahaUrl.cs" />

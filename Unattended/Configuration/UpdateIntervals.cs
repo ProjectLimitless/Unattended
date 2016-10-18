@@ -19,10 +19,6 @@ namespace Limitless.Unattended.Configuration
     public static class UpdateIntervals
     {
         /// <summary>
-        /// Check for updates at application start.
-        /// </summary>
-        public const string Startup = "startup";
-        /// <summary>
         /// Check for updates once a day.
         /// </summary>
         public const string Daily = "daily";

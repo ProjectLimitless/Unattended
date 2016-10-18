@@ -19,44 +19,44 @@ namespace Limitless.Unattended.Enums
     /// Custom event result types for the (subset of) Omaha protocol.
     /// </summary>
     [Serializable]
-    public enum OmahaEventResultTypes
+    public enum OmahaEventResultType
     {
         [XmlEnum("0")]
-        Unknown = 0,
+        Unknown,
         /// <summary>
         /// The result when no update is available.
         /// </summary>
         [XmlEnum("1")]
-        NoUpdate = 1,
+        NoUpdate,
         /// <summary>
         /// The result when a new update is available.
         /// </summary>
         [XmlEnum("2")]
-        Available = 2,
+        Available,
         /// <summary>
         /// Operation success.
         /// </summary>
         [XmlEnum("3")]
-        Success = 3,
+        Success,
         /// <summary>
         /// Success and app restarted.
         /// </summary>
         [XmlEnum("4")]
-        SuccessRestarted = 4,
+        SuccessRestarted,
         /// <summary>
         /// Operation failed.
         /// </summary>
         [XmlEnum("5")]
-        Error = 5,
+        Error,
         /// <summary>
         /// Operation cancelled.
         /// </summary>
         [XmlEnum("6")]
-        Cancelled = 6,
+        Cancelled,
         /// <summary>
         /// Operation started.
         /// </summary>
         [XmlEnum("7")]
-        Started = 7
+        Started
     }
 }

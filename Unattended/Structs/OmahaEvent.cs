@@ -26,21 +26,21 @@ namespace Limitless.Unattended.Structs
         /// Defaults to 'Unknown (0)'
         /// </summary>
         [XmlAttribute("eventtype")]
-        public OmahaEventTypes EventType { get; set; }
+        public OmahaEventType EventType { get; set; }
         /// <summary>
         /// The Omaha event result.
         /// Defaults to 'No Update (7)'
         /// </summary>
         [XmlAttribute("eventresult")]
-        public OmahaEventResultTypes EventResult { get; set; }
+        public OmahaEventResultType EventResult { get; set; }
 
         /// <summary>
         /// Default constructor.
         /// </summary>
         public OmahaEvent()
         {
-            EventType = OmahaEventTypes.Unknown;
-            EventResult = OmahaEventResultTypes.NoUpdate;
+            EventType = OmahaEventType.Unknown;
+            EventResult = OmahaEventResultType.NoUpdate;
         }
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace Limitless.Unattended.Structs
         /// </summary>
         /// <param name="eventType">The event type to set the event to</param>
         /// <param name="eventResult">The event result to set the event to</param>
-        public OmahaEvent(OmahaEventTypes eventType, OmahaEventResultTypes eventResult)
+        public OmahaEvent(OmahaEventType eventType, OmahaEventResultType eventResult)
         {
             EventType = eventType;
             EventResult = eventResult;
