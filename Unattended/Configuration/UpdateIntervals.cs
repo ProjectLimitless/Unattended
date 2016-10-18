@@ -22,5 +22,9 @@ namespace Limitless.Unattended.Configuration
         /// Check for updates once a day.
         /// </summary>
         public const string Daily = "daily";
+        /// <summary>
+        /// Check for updates once an hour.
+        /// </summary>
+        public const string Hourly = "hourly";
     }
 }

@@ -27,6 +27,8 @@ using Limitless.ioRPC.Structs;
 using System.Threading;
 using System.Text;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.IO.Compression;
 
 namespace Limitless.Unattended
 {
@@ -205,15 +207,17 @@ namespace Limitless.Unattended
             // Schedule the next update check time
             if (updateInterval == UpdateIntervals.Daily)
             {
-                //PeriodicTask.Run(ProcessUpdates, TimeSpan.FromDays(1));
-                PeriodicTask.Run(ProcessUpdates, TimeSpan.FromSeconds(2));
-                log.Info("Task created to check for updates");
+                PeriodicTask.Run(ProcessUpdates, TimeSpan.FromDays(1));
             }
-
+            else if (updateInterval == UpdateIntervals.Hourly)
+            {
+                PeriodicTask.Run(ProcessUpdates, TimeSpan.FromHours(1));
+            }
+            log.Info("Task created to check for updates");
 
             //TODO: Create the secondary path / backup to the alternate path?
 
-            
+
 
             // Run the loop
             Run();
@@ -258,13 +262,125 @@ namespace Limitless.Unattended
                     {
                         log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
 
+                        // Check if the update directory exists, if so, delete the it and its contents
+                        string updatePath = basePath + Path.DirectorySeparatorChar + "temp";
+                        if (Directory.Exists(updatePath))
+                        {
+                            Directory.Delete(updatePath, true);
+                        }
+                        DirectoryInfo dir = Directory.CreateDirectory(updatePath);
+                        Dictionary<OmahaManifest, string> downloadedPackages = new Dictionary<OmahaManifest, string>();
                         // Download the updates
                         foreach (OmahaManifest manifest in omahaManifests)
                         {
-                            log.Info("Downloading update for {0} (Size {1} MB)", manifest.Package.Name, ((double)(manifest.Package.SizeInBytes)/1024.00/1024.00).ToString("F5"));
+                            string downloadPath = updatePath + Path.DirectorySeparatorChar + manifest.Package.Name;
+                            log.Info("Downloading update for {0} (Size {1} MB) from '{2}'", manifest.Package.Name, ((double)(manifest.Package.SizeInBytes) / 1024.00 / 1024.00).ToString("F5"), manifest.Url.Codebase);
 
-                            continue WITH THE DOWNLOADER
+                            WebClient webClient = new WebClient();
+                            try
+                            {
+                                webClient.DownloadFile(manifest.Url.Codebase, downloadPath);
+                            }
+                            catch (WebException ex)
+                            {
+                                log.Warn("Download failed for {0} from '{1}': {2} ({3}). Will be retried at next interval.", 
+                                    manifest.Package.Name, 
+                                    manifest.Url.Codebase,
+                                    ex.Status,
+                                    ex.Message);
+                                if (ex.InnerException != null)
+                                {
+                                    log.Warn("Download failed detail: {0}", ex.InnerException.Message);
+                                }
+                            }
+                            log.Info("Download completed for {0}. Checking integrity.", manifest.Package.Name);
+                            SHA256Managed sha = new SHA256Managed();
+                            using (FileStream fileStream = new FileStream(downloadPath, FileMode.Open))
+                            {
+                                byte[] hashBytes = sha.ComputeHash(fileStream);
+                                // Get the string of the hash
+                                StringBuilder stringBuilder = new StringBuilder();
+                                foreach (byte b in hashBytes)
+                                {
+                                    stringBuilder.AppendFormat("{0:x2}", b);
+                                }
+                                string hashString = stringBuilder.ToString();
+                                if (hashString == manifest.Package.SHA256Hash)
+                                {
+                                    log.Info("Verified intergrity of downloaded file for package {0}", manifest.Package.Name);
+                                    downloadedPackages.Add(manifest, downloadPath);
+                                }
+                                else
+                                {
+                                    log.Error("Unable to verify integrity of downloaded file for package {0}. Download will be discarded and retried at next interval.", manifest.Package.Name);
+                                }
+                            }
                         }
+
+                        log.Debug("Packages ready for updating: {0}", downloadedPackages.Count);
+
+                        // Get the new version
+                        string currentVersionDirectory = Path.GetDirectoryName(applicationPath);
+                        KeyValuePair<DateTime, int>? currentVersion = ParseVersionDirectory(currentVersionDirectory);
+                        if (currentVersion == null)
+                        {
+                            currentVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);
+                        }
+                        DateTime newDate = DateTime.Now;
+                        int newCounter = 0;
+                        // Check if the year-month-day strings match
+                        if (currentVersion.Value.Key.ToString("yyyyMMdd") == newDate.ToString("yyyyMMdd"))
+                        {
+                            newCounter = currentVersion.Value.Value + 1;
+                        }
+                        string newVersionDirectory = newDate.ToString("yyyyMMdd") + "." + newCounter;
+                        newVersionDirectory = basePath + Path.DirectorySeparatorChar + newVersionDirectory;
+                        log.Debug("New version directory set as {0}", newVersionDirectory);
+
+                        // Duplicate the current running version
+                        try
+                        { 
+                            DirectoryCopy(currentVersionDirectory, newVersionDirectory, true);
+                        }
+                        catch (Exception ex)
+                        {
+                            log.Error("Unable to create new version: {0}", ex.Message);
+                            isUpdating = false;
+                            return;
+                        }
+
+                        // Extract the packages into the new version directory
+                        foreach (KeyValuePair<OmahaManifest, string> kvp in downloadedPackages)
+                        {
+                            log.Trace("Extracting package {0}...", kvp.Key.Package.Name);
+                            try
+                            {
+                                // Extract and overwrite
+                                ZipArchive archive = ZipFile.OpenRead(kvp.Value);
+                                foreach (ZipArchiveEntry entry in archive.Entries)
+                                {
+                                    if (entry.Name == "" && entry.FullName != "" && entry.Length == 0)
+                                    {
+                                        Directory.CreateDirectory(newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName);
+                                    }
+                                    else
+                                    {
+                                        ZipFileExtensions.ExtractToFile(entry, newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName, true);
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                log.Warn("Unable to extract package ({0}) to new version directory {1}: {2}", kvp.Key.Package.Name, newVersionDirectory, ex.Message);
+                                continue;
+                            }
+                            log.Trace("Package {0} extracted", kvp.Key.Package.Name);
+                        }
+
+                        // Update the application by checking the update policy
+                        // if off, do nothing - TODO: Remove off?
+                        // if restart, do so now
+                        // if prompt, query and set state
 
                         isUpdating = false;
                     }
@@ -463,51 +579,25 @@ namespace Limitless.Unattended
             foreach (string applicationDirectory in applicationDirectories)
             {
                 log.Debug("Directory in application root path: '{0}'", applicationDirectory);
-                string directoryName = applicationDirectory.Substring(applicationDirectory.LastIndexOf(Path.DirectorySeparatorChar));
-                directoryName = directoryName.Replace(Path.DirectorySeparatorChar.ToString(), "");
-
-                // Check if the path conforms to the date.counter format
-                // but first, check if there is a '.' for date.counter format
-                // The actual format is 20161231.1
-                if (directoryName.Contains(".") == true)
+                KeyValuePair<DateTime, int>? version = ParseVersionDirectory(applicationDirectory);
+                if (version == null)
                 {
-                    // parts[0] should be the date and parts[1] should be the counter
-                    string[] parts = directoryName.Split('.');
-                    if (parts.Length == 2)
-                    {
-                        DateTime datePart;
-                        bool dateParsed = DateTime.TryParseExact(
-                            parts[0],
-                            applicationPathDateFormat,
-                            CultureInfo.InvariantCulture,
-                            DateTimeStyles.None,
-                            out datePart);
-                        if (dateParsed == true)
-                        {
-                            log.Debug(" Path has date set as: '{0}'", datePart.ToString("yyyy-MM-dd"));
-                            // Check if parts[1] is a counter value
-                            int counter;
-                            bool counterParsed = Int32.TryParse(parts[1], out counter);
-                            if (counterParsed == true)
-                            {
-                                log.Debug(" Path has counter value of: '{0}'", counter);
+                    log.Debug("Directory '{0}' does not conform to update folder specifications", applicationDirectory);
+                    continue;
+                }
 
-                                if (datePart > latestVersion.Key)
-                                {
-                                    latestVersion = new KeyValuePair<DateTime, int>(datePart, counter);
-                                    latestVersionDirectory = applicationDirectory;
-                                }
-                                else if (datePart == latestVersion.Key)
-                                {
-                                    if (counter > latestVersion.Value)
-                                    {
-                                        // Dates are the same, check counter
-                                        latestVersion = new KeyValuePair<DateTime, int>(datePart, counter);
-                                        latestVersionDirectory = applicationDirectory;
-                                    }
-                                }
-                            }
-                        }
+                if (version.Value.Key > latestVersion.Key)
+                {
+                    latestVersion = version.Value;
+                    latestVersionDirectory = applicationDirectory;
+                }
+                else if (version.Value.Key == latestVersion.Key)
+                {
+                    if (version.Value.Value > latestVersion.Value)
+                    {
+                        // Dates are the same, check counter
+                        latestVersion = version.Value;
+                        latestVersionDirectory = applicationDirectory;
                     }
                 }
             }
@@ -519,6 +609,90 @@ namespace Limitless.Unattended
             }
             log.Info("Latest version is '{0}.{1}'", latestVersion.Key.ToString(applicationPathDateFormat), latestVersion.Value);
             return latestVersionDirectory;
+        }
+
+        /// <summary>
+        /// Parses directoryName and returns the KeyValuePair result or null.
+        /// </summary>
+        /// <param name="directoryName">The name of the directory to parse</param>
+        /// <returns>The parsed version information or null</returns>
+        private KeyValuePair<DateTime, int>? ParseVersionDirectory(string directoryName)
+        {
+            directoryName = directoryName.Substring(directoryName.LastIndexOf(Path.DirectorySeparatorChar));
+            directoryName = directoryName.Replace(Path.DirectorySeparatorChar.ToString(), "");
+            // Check if the path conforms to the date.counter format
+            // but first, check if there is a '.' for date.counter format
+            // The actual format is 20161231.1
+            if (directoryName.Contains(".") == true)
+            {
+                // parts[0] should be the date and parts[1] should be the counter
+                string[] parts = directoryName.Split('.');
+                if (parts.Length == 2)
+                {
+                    DateTime datePart;
+                    bool dateParsed = DateTime.TryParseExact(
+                        parts[0],
+                        applicationPathDateFormat,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out datePart);
+                    if (dateParsed == true)
+                    {
+                        int counter;
+                        bool counterParsed = Int32.TryParse(parts[1], out counter);
+                        if (counterParsed == true)
+                        {
+                            return new KeyValuePair<DateTime, int>(datePart, counter);
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Copy a directory and all its contents from sourceDirName to destDirName.
+        /// This is taken from MSDN. https://msdn.microsoft.com/en-us/library/bb762914(v=vs.110).aspx
+        /// </summary>
+        /// <param name="sourceDirName">The source directory</param>
+        /// <param name="destDirName">The destination directory</param>
+        /// <param name="copySubDirs">If true, all subdirectories and their contents will also  be copied</param>
+        private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
+        {
+            // Get the subdirectories for the specified directory.
+            DirectoryInfo dir = new DirectoryInfo(sourceDirName);
+
+            if (!dir.Exists)
+            {
+                throw new DirectoryNotFoundException(
+                    "Source directory does not exist or could not be found: "
+                    + sourceDirName);
+            }
+
+            DirectoryInfo[] dirs = dir.GetDirectories();
+            // If the destination directory doesn't exist, create it.
+            if (!Directory.Exists(destDirName))
+            {
+                Directory.CreateDirectory(destDirName);
+            }
+
+            // Get the files in the directory and copy them to the new location.
+            FileInfo[] files = dir.GetFiles();
+            foreach (FileInfo file in files)
+            {
+                string temppath = Path.Combine(destDirName, file.Name);
+                file.CopyTo(temppath, false);
+            }
+
+            // If copying subdirectories, copy them and their contents to new location.
+            if (copySubDirs)
+            {
+                foreach (DirectoryInfo subdir in dirs)
+                {
+                    string temppath = Path.Combine(destDirName, subdir.Name);
+                    DirectoryCopy(subdir.FullName, temppath, copySubDirs);
+                }
+            }
         }
 
         #region Event Handlers
