@@ -36,8 +36,8 @@ namespace Limitless.Unattended.Configuration
         /// </summary>
         public UpdatesSection()
         {
-            Strategy = UpdateStrategies.Prompt;
-            Interval = UpdateIntervals.Daily;
+            Strategy = UpdateStrategy.Default;
+            Interval = UpdateInterval.Default;
             Channel = "stable";
         }
     }

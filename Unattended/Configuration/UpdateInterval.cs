@@ -16,7 +16,7 @@ namespace Limitless.Unattended.Configuration
     /// <summary>
     /// Checking intervals for update.
     /// </summary>
-    public static class UpdateIntervals
+    public static class UpdateInterval
     {
         /// <summary>
         /// Check for updates once a day.
@@ -26,5 +26,27 @@ namespace Limitless.Unattended.Configuration
         /// Check for updates once an hour.
         /// </summary>
         public const string Hourly = "hourly";
+        /// <summary>
+        /// The default update interval. Set to 'Hourly'.
+        /// </summary>
+        public const string Default = Hourly;
+
+        /// <summary>
+        /// Checks if the given interval is valid.
+        /// </summary>
+        /// <param name="interval">The interval as a string</param>
+        /// <returns>True if valid, false otherwise</returns>
+        public static bool IsValid(string interval)
+        {
+            switch (interval)
+            {
+                case UpdateInterval.Daily:
+                    return true;
+                case UpdateInterval.Hourly:
+                    return true;
+                default:
+                    return false;
+            }
+        }
     }
 }

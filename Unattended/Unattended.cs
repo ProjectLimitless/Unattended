@@ -123,22 +123,28 @@ namespace Limitless.Unattended
             log.Info("Path to check for configs '{0}'", absoluteConfigPath);
 
             // Validation checks
-            // 1. Config directory
+            // Config directory
             if (Directory.Exists(absoluteConfigPath) == false)
             {
                 log.Fatal("Configuration directory '{0}' does not exist or cannot be read from", absoluteConfigPath);
                 throw new IOException("Configuration directory does not exist or cannot be read from: " + absoluteConfigPath);
             }
 
-            // 2. Validate the strategy
-            updateStrategy = GetValidUpdateStrategy(settings.Updates.Strategy);
+            // Validate the strategy from the config
+            if (UpdateStrategy.IsValid(settings.Updates.Strategy) == false)
+            {
+                updateStrategy = UpdateStrategy.Default;
+            }
             log.Info("Update strategy set as '{0}'", updateStrategy);
             
-            // 3. Validate the interval
-            updateInterval = GetValidUpdateInterval(settings.Updates.Interval);
+            // Validate the interval from the config
+            if (UpdateInterval.IsValid(settings.Updates.Interval) == false)
+            {
+                updateInterval = UpdateInterval.Default;
+            }
             log.Info("Update interval set as '{0}'", updateInterval);
 
-            // 4. Check base path
+            // Check base path
             basePath = Path.GetFullPath(settings.Target.BasePath);
             if (Directory.Exists(basePath) == false)
             {
@@ -146,13 +152,13 @@ namespace Limitless.Unattended
                 throw new IOException("Application root directory does not exist at " + basePath);
             }
 
-            // 5. Determine the latest version of the application
+            // Determine the latest version of the application
             log.Debug("Getting available directories in basepath '{0}'", basePath);
             string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
             string latestVersionDirectory = GetLatestVersionDirectory(applicationDirectories);
             log.Info("Latest version directory is '{0}'", latestVersionDirectory);
 
-            // 6. Check if the target application exists in the latest verion path
+            // Check if the target application exists in the latest verion path
             applicationPath = latestVersionDirectory + Path.DirectorySeparatorChar + settings.Target.Filename;
             log.Info("Target application is at '{0}'", applicationPath);
             if (File.Exists(applicationPath) == false)
@@ -172,7 +178,7 @@ namespace Limitless.Unattended
             foreach (string file in configFiles)
             {
                 log.Debug("Check file '{0}'", Path.GetFileName(file));
-                UpdateManifest manifest = LoadUpdateManifest(file);
+                UpdateManifest manifest = UpdateManifest.FromFile(file);
                 if (manifest != null)
                 {
                     updateManifests.Add(manifest);
@@ -192,11 +198,11 @@ namespace Limitless.Unattended
             ProcessUpdates();
 
             // Schedule the next update check time
-            if (updateInterval == UpdateIntervals.Daily)
+            if (updateInterval == UpdateInterval.Daily)
             {
                 PeriodicTask.Run(ProcessUpdates, TimeSpan.FromSeconds(30));
             }
-            else if (updateInterval == UpdateIntervals.Hourly)
+            else if (updateInterval == UpdateInterval.Hourly)
             {
                 PeriodicTask.Run(ProcessUpdates, TimeSpan.FromHours(1));
             }
@@ -257,6 +263,8 @@ namespace Limitless.Unattended
 
             // Wait 5s then kill
             ioServer.ExitAndWait(5 * 1000);
+            ioServer.CommandResultReceived -= IoServer_CommandResultReceived;
+            ioServer.CommandExceptionReceived -= IoServer_CommandExceptionReceived;
             ioServer.Dispose();
             log.Debug("Client application stopped");
         }
@@ -399,7 +407,7 @@ namespace Limitless.Unattended
 
                         
                         // Update the application by checking the update policy
-                        if (updateStrategy == UpdateStrategies.Restart)
+                        if (updateStrategy == UpdateStrategy.Restart)
                         {
                             /// TODO: This is duplicate code, fix!
                             // 5. Determine the latest version of the application
@@ -420,7 +428,7 @@ namespace Limitless.Unattended
                             ShutdownClient();
                             StartClient();
                         }
-                        else if (updateStrategy == UpdateStrategies.Prompt)
+                        else if (updateStrategy == UpdateStrategy.Prompt)
                         {
                             // if prompt, query and set state
                             ioCommand command = new ioCommand("CanUpdate");
@@ -456,7 +464,7 @@ namespace Limitless.Unattended
             foreach (UpdateManifest updateManifest in updateManifests)
             {
                 OmahaManifest omahaManifest;
-                if (UpdateAvailable(updateManifest, out omahaManifest) == true)
+                if (IsUpdateAvailable(updateManifest, out omahaManifest) == true)
                 {
                     log.Info("Update available for {0}. Version {1} ({2})", updateManifest.AppID, omahaManifest.Version, omahaManifest.TraceID);
                     omahaManifests.Add(omahaManifest);
@@ -471,7 +479,7 @@ namespace Limitless.Unattended
         /// <param name="updateManifest">The manifest to check</param>
         /// <param name="omahaManifest">The Omaha update manifest, if result if true</param>
         /// <returns>true if the given updateManifest requires an update</returns>
-        private bool UpdateAvailable(UpdateManifest updateManifest, out OmahaManifest omahaManifest)
+        private bool IsUpdateAvailable(UpdateManifest updateManifest, out OmahaManifest omahaManifest)
         {
             omahaManifest = null;
             log.Debug("Checking update for application '{0}' at '{1}'", updateManifest.AppID, updateManifest.ServerUri);
@@ -556,73 +564,7 @@ namespace Limitless.Unattended
             }
             return false;
         }
-
-        /// <summary>
-        /// Loads and parses an update configuration manifest.
-        /// </summary>
-        /// <param name="path">The path to the manifest</param>
-        /// <returns>The parsed update manifest</returns>
-        private UpdateManifest LoadUpdateManifest(string path)
-        {
-            UpdateManifest manifest = null;
-            XmlSerializer parser = new XmlSerializer(typeof(UpdateManifest));
-            try
-            {
-                manifest = (UpdateManifest)parser.Deserialize(new StreamReader(path));
-            }
-            catch (Exception ex)
-            {
-                log.Fatal("Unable to parse update manifest '{0}': {1}", Path.GetFileName(path), ex.Message);
-                throw;
-            }
-            return manifest;
-        }
-
-        /// <summary>
-        /// Checks if the given checkStrategy is valid and returns the valid value.
-        /// </summary>
-        /// <param name="checkStrategy">The desired strategy</param>
-        /// <returns>checkStrategy if valid, the default 'restart' otherwise</returns>
-        private string GetValidUpdateStrategy(string checkStrategy)
-        {
-            string strategy = "";
-            switch (checkStrategy.ToLower())
-            {
-                case UpdateStrategies.Prompt:
-                    strategy = UpdateStrategies.Prompt;
-                    break;
-                case UpdateStrategies.Restart:
-                    strategy = UpdateStrategies.Restart;
-                    break;
-                default:
-                    log.Warn("The update strategy '{0}' is not valid, will default to using 'restart'", checkStrategy);
-                    strategy = UpdateStrategies.Restart;
-                    break;
-            }
-            return strategy;
-        }
-
-        /// <summary>
-        /// Checks if the given checkInterval is valid and returns the valid value.
-        /// </summary>
-        /// <param name="checkInterval">The desired interval</param>
-        /// <returns>checkInterval if valid, the default 'daily' otherwise</returns>
-        private string GetValidUpdateInterval(string checkInterval)
-        {
-            string interval = "";
-            switch (checkInterval.ToLower())
-            {
-                case UpdateIntervals.Daily:
-                    interval = UpdateIntervals.Daily;
-                    break;
-                default:
-                    log.Warn("The update interval '{0}' is not valid, will default to using 'daily'", checkInterval);
-                    interval = UpdateIntervals.Daily;
-                    break;
-            }
-            return interval;
-        }
-
+        
         /// <summary>
         /// Get's the latest version application path from the list of given directories.
         /// </summary>

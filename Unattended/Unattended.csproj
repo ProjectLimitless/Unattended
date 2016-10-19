@@ -63,8 +63,8 @@
     <Compile Include="Configuration\UnattendedSection.cs" />
     <Compile Include="Configuration\TargetSection.cs" />
     <Compile Include="Configuration\UpdatesSection.cs" />
-    <Compile Include="Configuration\UpdateIntervals.cs" />
-    <Compile Include="Configuration\UpdateStrategies.cs" />
+    <Compile Include="Configuration\UpdateInterval.cs" />
+    <Compile Include="Configuration\UpdateStrategy.cs" />
     <Compile Include="Enums\OmahaEventResultType.cs" />
     <Compile Include="Enums\OmahaEventType.cs" />
     <Compile Include="PeriodicTask.cs" />

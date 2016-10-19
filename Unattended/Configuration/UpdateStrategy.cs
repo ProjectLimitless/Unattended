@@ -16,7 +16,7 @@ namespace Limitless.Unattended.Configuration
     /// <summary>
     /// Contains the possible update strategies.
     /// </summary>
-    public static class UpdateStrategies
+    public static class UpdateStrategy
     {
         /// <summary>
         /// In this strategy, Unattended will query the child application via ioRPC
@@ -29,5 +29,27 @@ namespace Limitless.Unattended.Configuration
         /// as an update has been completely applied.
         /// </summary>
         public const string Restart = "restart";
+        /// <summary>
+        /// The default update strategy. Set to 'Restart'.
+        /// </summary>
+        public const string Default = Restart;
+
+        /// <summary>
+        /// Checks if the given strategy is valid.
+        /// </summary>
+        /// <param name="strategy">The strategy as a string</param>
+        /// <returns>True if valid, false otherwise</returns>
+        public static bool IsValid(string strategy)
+        {
+            switch (strategy)
+            {
+                case UpdateStrategy.Prompt:
+                    return true;
+                case UpdateStrategy.Restart:
+                    return true;
+                default:
+                    return false;
+            }
+        }
     }
 }

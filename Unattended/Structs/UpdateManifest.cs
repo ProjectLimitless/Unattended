@@ -10,7 +10,8 @@
 * You should have received a copy of the Apache License Version 2.0 with
 * Unattended. If not, see http://www.apache.org/licenses/LICENSE-2.0.
 */
-
+using System;
+using System.IO;
 using System.Xml.Serialization;
 
 namespace Limitless.Unattended.Structs
@@ -35,5 +36,20 @@ namespace Limitless.Unattended.Structs
         /// The URI of the update server.
         /// </summary>
         public string ServerUri { get; set; }
+
+        /// <summary>
+        /// Loads and parses an UpdateManifest from the specified path.
+        /// </summary>
+        /// <param name="path">The path of the manifest</param>
+        /// <exception cref="FileNotFoundException"/>
+        /// <exception cref="InvalidOperationException"/>
+        /// <returns>The parsed manifest</returns>
+        public static UpdateManifest FromFile(string path)
+        {
+            UpdateManifest manifest = null;
+            XmlSerializer parser = new XmlSerializer(typeof(UpdateManifest));
+            manifest = (UpdateManifest)parser.Deserialize(new StreamReader(path));
+            return manifest;
+        }
     }
 }
