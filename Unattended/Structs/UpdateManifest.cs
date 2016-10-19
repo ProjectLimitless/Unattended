@@ -27,6 +27,11 @@ namespace Limitless.Unattended.Structs
         /// </summary>
         public string AppID { get; set; }
         /// <summary>
+        /// The path to the application to check version of and update.
+        /// It can be any .NET versionable file like an exe and dll.
+        /// </summary>
+        public string AppPath { get; set; }
+        /// <summary>
         /// The URI of the update server.
         /// </summary>
         public string ServerUri { get; set; }

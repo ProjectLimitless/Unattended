@@ -29,10 +29,5 @@ namespace Limitless.Unattended.Configuration
         /// as an update has been completely applied.
         /// </summary>
         public const string Restart = "restart";
-        /// <summary>
-        /// Using the off strategy is the same as running the target application
-        /// without using Unattended.
-        /// </summary>
-        public const string Off = "off";
     }
 }

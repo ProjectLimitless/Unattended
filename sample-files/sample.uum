@@ -2,5 +2,6 @@
 <!-- Sample update manifest file -->
 <UpdateManifest>
   <AppID>limitless.core</AppID>
+  <AppPath>SampleApplication.exe</AppPath>
   <ServerUri>http://unattendedserver.local</ServerUri>
 </UpdateManifest>

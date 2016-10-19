@@ -14,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SampleApplication
@@ -25,7 +26,13 @@ namespace SampleApplication
     {
         public bool CanUpdate()
         {
+            Thread.Sleep(10000);
             return true;
+        }
+
+        public string Ping()
+        {
+            return "Pong A";
         }
 
         public void Exit()

@@ -186,20 +186,7 @@ namespace Limitless.Unattended
         /// </summary>
         public void Start()
         {
-            // Launch the application and attach the ioRPC
-            log.Info("Starting target application...");
-            // Setup parameters for ioRPC
-            ProcessStartInfo processInfo = new ProcessStartInfo();
-            processInfo.FileName = applicationPath;
-            processInfo.Arguments = applicationParameters;
-
-            ioServer = new Server(processInfo);
-            // Add event handlers
-            ioServer.CommandResultReceived += IoServer_CommandResultReceived;
-            ioServer.CommandExceptionReceived += IoServer_CommandExceptionReceived;
-            ioServer.Exited += IoServer_Exited;
-            // Start the server
-            ioServer.Start();
+            StartClient();
 
             // Always check for updates on startup
             ProcessUpdates();
@@ -207,18 +194,14 @@ namespace Limitless.Unattended
             // Schedule the next update check time
             if (updateInterval == UpdateIntervals.Daily)
             {
-                PeriodicTask.Run(ProcessUpdates, TimeSpan.FromDays(1));
+                PeriodicTask.Run(ProcessUpdates, TimeSpan.FromSeconds(30));
             }
             else if (updateInterval == UpdateIntervals.Hourly)
             {
                 PeriodicTask.Run(ProcessUpdates, TimeSpan.FromHours(1));
             }
             log.Info("Task created to check for updates");
-
-            //TODO: Create the secondary path / backup to the alternate path?
-
-
-
+            
             // Run the loop
             Run();
         }
@@ -232,8 +215,42 @@ namespace Limitless.Unattended
             while (Console.KeyAvailable == false)
             {
                 log.Debug("Loop update");
+                ioCommand pingCommand = new ioCommand("Ping");
+                ioServer.Execute(pingCommand);
                 Thread.Sleep(1000);
             }
+
+            ShutdownClient();
+        }
+
+        /// <summary>
+        /// Start the client
+        /// </summary>
+        private void StartClient()
+        {
+            // Launch the application and attach the ioRPC
+            log.Info("Starting target application...");
+            // Setup parameters for ioRPC
+            ProcessStartInfo processInfo = new ProcessStartInfo();
+            processInfo.FileName = applicationPath;
+            processInfo.Arguments = applicationParameters;
+            
+            ioServer = new Server(processInfo);
+            // Add event handlers
+            ioServer.CommandResultReceived += IoServer_CommandResultReceived;
+            ioServer.CommandExceptionReceived += IoServer_CommandExceptionReceived;
+            ioServer.Exited += IoServer_Exited;
+            // Start the server
+            ioServer.Start();
+            log.Debug("Client application started");
+        }
+
+        /// <summary>
+        /// Shuts down the client
+        /// </summary>
+        private void ShutdownClient()
+        {
+            log.Info("Shutting down target application");
             // Send exit command
             ioCommand exitCommand = new ioCommand("Exit");
             ioServer.Execute(exitCommand);
@@ -241,6 +258,7 @@ namespace Limitless.Unattended
             // Wait 5s then kill
             ioServer.ExitAndWait(5 * 1000);
             ioServer.Dispose();
+            log.Debug("Client application stopped");
         }
         
         /// <summary>
@@ -356,16 +374,18 @@ namespace Limitless.Unattended
                             try
                             {
                                 // Extract and overwrite
-                                ZipArchive archive = ZipFile.OpenRead(kvp.Value);
-                                foreach (ZipArchiveEntry entry in archive.Entries)
-                                {
-                                    if (entry.Name == "" && entry.FullName != "" && entry.Length == 0)
+                                using(ZipArchive archive = ZipFile.OpenRead(kvp.Value))
+                                { 
+                                    foreach (ZipArchiveEntry entry in archive.Entries)
                                     {
-                                        Directory.CreateDirectory(newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName);
-                                    }
-                                    else
-                                    {
-                                        ZipFileExtensions.ExtractToFile(entry, newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName, true);
+                                        if (entry.Name == "" && entry.FullName != "" && entry.Length == 0)
+                                        {
+                                            Directory.CreateDirectory(newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName);
+                                        }
+                                        else
+                                        {
+                                            ZipFileExtensions.ExtractToFile(entry, newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName, true);
+                                        }
                                     }
                                 }
                             }
@@ -377,10 +397,36 @@ namespace Limitless.Unattended
                             log.Trace("Package {0} extracted", kvp.Key.Package.Name);
                         }
 
+                        
                         // Update the application by checking the update policy
-                        // if off, do nothing - TODO: Remove off?
-                        // if restart, do so now
-                        // if prompt, query and set state
+                        if (updateStrategy == UpdateStrategies.Restart)
+                        {
+                            /// TODO: This is duplicate code, fix!
+                            // 5. Determine the latest version of the application
+                            log.Debug("Getting available directories in basepath '{0}'", basePath);
+                            string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
+                            string latestVersionDirectory = GetLatestVersionDirectory(applicationDirectories);
+                            log.Info("Latest version directory is '{0}'", latestVersionDirectory);
+
+                            // 6. Check if the target application exists in the latest verion path
+                            applicationPath = latestVersionDirectory + Path.DirectorySeparatorChar + Path.GetFileName(applicationPath);
+                            log.Info("Target application is at '{0}'", applicationPath);
+                            if (File.Exists(applicationPath) == false)
+                            {
+                                log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
+                                throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
+                            }
+                            //
+                            ShutdownClient();
+                            StartClient();
+                        }
+                        else if (updateStrategy == UpdateStrategies.Prompt)
+                        {
+                            // if prompt, query and set state
+                            ioCommand command = new ioCommand("CanUpdate");
+                            ioServer.Execute(command);
+                        }
+                        
 
                         isUpdating = false;
                     }
@@ -430,7 +476,20 @@ namespace Limitless.Unattended
             omahaManifest = null;
             log.Debug("Checking update for application '{0}' at '{1}'", updateManifest.AppID, updateManifest.ServerUri);
 
-            string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            string version = "0.0.0.0";
+            try
+            {
+                string currentVersionDirectory = Path.GetDirectoryName(applicationPath);
+                AssemblyName assemblyName = AssemblyName.GetAssemblyName(currentVersionDirectory + Path.DirectorySeparatorChar + updateManifest.AppPath);
+                version = assemblyName.Version.ToString();
+                log.Trace("{0} is at assembly version {1}", updateManifest.AppID, version);
+            }
+            catch (Exception ex)
+            {
+                log.Warn("Unable to get assembly version for '{0}': {1}", updateManifest.AppID, ex.Message);
+                return false;
+            }
+            
             // Create the data to send to the server
             OmahaRequest request = new OmahaRequest();
             request.Application.ClientID = clientId;
@@ -534,9 +593,6 @@ namespace Limitless.Unattended
                     break;
                 case UpdateStrategies.Restart:
                     strategy = UpdateStrategies.Restart;
-                    break;
-                case UpdateStrategies.Off:
-                    strategy = UpdateStrategies.Off;
                     break;
                 default:
                     log.Warn("The update strategy '{0}' is not valid, will default to using 'restart'", checkStrategy);
@@ -709,6 +765,31 @@ namespace Limitless.Unattended
         private void IoServer_CommandResultReceived(object sender, ioRPC.Events.ioEventArgs e)
         {
             log.Info("ioRPC - Client Result: '{0} - {1}'", e.CommandName, e.Data);
+            if (e.CommandName == "CanUpdate")
+            {
+                bool canUpdate = (bool)e.Data;
+                if (canUpdate)
+                {
+                    /// TODO: This is duplicate code, fix!
+                    // 5. Determine the latest version of the application
+                    log.Debug("Getting available directories in basepath '{0}'", basePath);
+                    string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
+                    string latestVersionDirectory = GetLatestVersionDirectory(applicationDirectories);
+                    log.Info("Latest version directory is '{0}'", latestVersionDirectory);
+
+                    // 6. Check if the target application exists in the latest verion path
+                    applicationPath = latestVersionDirectory + Path.DirectorySeparatorChar + Path.GetFileName(applicationPath);
+                    log.Info("Target application is at '{0}'", applicationPath);
+                    if (File.Exists(applicationPath) == false)
+                    {
+                        log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
+                        throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
+                    }
+                    //
+                    ShutdownClient();
+                    StartClient();
+                }
+            }
         }
         #endregion
     }
