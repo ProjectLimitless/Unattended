@@ -67,6 +67,7 @@
     <Compile Include="Configuration\UpdateStrategy.cs" />
     <Compile Include="Enums\OmahaEventResultType.cs" />
     <Compile Include="Enums\OmahaEventType.cs" />
+    <Compile Include="Extensions\DirectoryInfoExtensions.cs" />
     <Compile Include="PeriodicTask.cs" />
     <Compile Include="ServiceDaemon.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -13,22 +13,23 @@
 using System;
 using System.IO;
 using System.Net;
+using System.Text;
+using System.Threading;
 using System.Reflection;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO.Compression;
 using System.Xml.Serialization;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 using NLog;
 using Limitless.ioRPC;
+using Limitless.ioRPC.Structs;
 using Limitless.Unattended.Enums;
 using Limitless.Unattended.Structs;
 using Limitless.Unattended.Configuration;
-using Limitless.ioRPC.Structs;
-using System.Threading;
-using System.Text;
-using System.Globalization;
-using System.Security.Cryptography;
-using System.IO.Compression;
+using Limitless.Unattended.Extensions;
 
 namespace Limitless.Unattended
 {
@@ -365,10 +366,11 @@ namespace Limitless.Unattended
 
                         // Duplicate the current running version
                         try
-                        { 
-                            DirectoryCopy(currentVersionDirectory, newVersionDirectory, true);
+                        {
+                            DirectoryInfo directoryInfo = new DirectoryInfo(currentVersionDirectory);
+                            directoryInfo.DeepCopyTo(newVersionDirectory);
                         }
-                        catch (Exception ex)
+                        catch (DirectoryNotFoundException ex)
                         {
                             log.Error("Unable to create new version: {0}", ex.Message);
                             isUpdating = false;
@@ -647,52 +649,7 @@ namespace Limitless.Unattended
             }
             return null;
         }
-
-        /// <summary>
-        /// Copy a directory and all its contents from sourceDirName to destDirName.
-        /// This is taken from MSDN. https://msdn.microsoft.com/en-us/library/bb762914(v=vs.110).aspx
-        /// </summary>
-        /// <param name="sourceDirName">The source directory</param>
-        /// <param name="destDirName">The destination directory</param>
-        /// <param name="copySubDirs">If true, all subdirectories and their contents will also  be copied</param>
-        private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
-        {
-            // Get the subdirectories for the specified directory.
-            DirectoryInfo dir = new DirectoryInfo(sourceDirName);
-
-            if (!dir.Exists)
-            {
-                throw new DirectoryNotFoundException(
-                    "Source directory does not exist or could not be found: "
-                    + sourceDirName);
-            }
-
-            DirectoryInfo[] dirs = dir.GetDirectories();
-            // If the destination directory doesn't exist, create it.
-            if (!Directory.Exists(destDirName))
-            {
-                Directory.CreateDirectory(destDirName);
-            }
-
-            // Get the files in the directory and copy them to the new location.
-            FileInfo[] files = dir.GetFiles();
-            foreach (FileInfo file in files)
-            {
-                string temppath = Path.Combine(destDirName, file.Name);
-                file.CopyTo(temppath, false);
-            }
-
-            // If copying subdirectories, copy them and their contents to new location.
-            if (copySubDirs)
-            {
-                foreach (DirectoryInfo subdir in dirs)
-                {
-                    string temppath = Path.Combine(destDirName, subdir.Name);
-                    DirectoryCopy(subdir.FullName, temppath, copySubDirs);
-                }
-            }
-        }
-
+        
         #region Event Handlers
         private void IoServer_Exited(object sender, EventArgs e)
         {
