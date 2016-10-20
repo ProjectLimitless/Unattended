@@ -17,7 +17,6 @@ using System.Text;
 using System.Threading;
 using System.Reflection;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO.Compression;
 using System.Xml.Serialization;
 using System.Collections.Generic;
@@ -123,31 +122,19 @@ namespace Limitless.Unattended
             {
                 updateStrategy = UpdateStrategy.Default;
             }
+            else updateStrategy = settings.Updates.Strategy;
             log.Info("Update strategy set as '{0}'", updateStrategy);
-            
+
             // Validate the interval from the config
             if (UpdateInterval.IsValid(settings.Updates.Interval) == false)
             {
                 updateInterval = UpdateInterval.Default;
             }
+            else updateInterval = settings.Updates.Interval;
             log.Info("Update interval set as '{0}'", updateInterval);
             
             target = new Target(settings.Target);
-            
-            // Determine the latest version of the application
-            log.Debug("Getting available directories in basepath '{0}'", basePath);
-            string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
-            string latestVersionDirectory = GetLatestVersionDirectory(applicationDirectories);
-            log.Info("Latest version directory is '{0}'", latestVersionDirectory);
-
-            // Check if the target application exists in the latest verion path
-            applicationPath = latestVersionDirectory + Path.DirectorySeparatorChar + settings.Target.Filename;
-            log.Info("Target application is at '{0}'", applicationPath);
-            if (File.Exists(applicationPath) == false)
-            {
-                log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
-                throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
-            }
+            log.Info("Latest version directory is '{0}'", target.LatestVersionDirectory());
             
             // Load / Parse configs
             string[] configFiles = Directory.GetFiles(absoluteConfigPath, "*.uum", SearchOption.AllDirectories);
@@ -161,14 +148,6 @@ namespace Limitless.Unattended
                 }
             }
             log.Info("Loaded {0} update manifest{1}", updateManifests.Count, (updateManifests.Count == 1 ? "" : "s"));
-
-            //TODO
-            // Commonly used with regards to target needs grouping
-            // latest application directory
-            // current version directory?
-            // latest version
-            // refresh the latest version and directory
-            // target included?
         }
 
         /// <summary>
@@ -176,7 +155,7 @@ namespace Limitless.Unattended
         /// </summary>
         public void Start()
         {
-            StartClient();
+            StartTargetApplication();
 
             // Always check for updates on startup
             ProcessUpdates();
@@ -210,13 +189,13 @@ namespace Limitless.Unattended
                 Thread.Sleep(1000);
             }
 
-            ShutdownClient();
+            ShutdownTargetApplication();
         }
 
         /// <summary>
-        /// Start the client
+        /// Start the target application using ioRPC
         /// </summary>
-        private void StartClient()
+        private void StartTargetApplication()
         {
             // Launch the application and attach the ioRPC
             log.Info("Starting target application...");
@@ -232,15 +211,15 @@ namespace Limitless.Unattended
             ioServer.Exited += IoServer_Exited;
             // Start the server
             ioServer.Start();
-            log.Debug("Client application started");
+            log.Debug("Target application started");
         }
 
         /// <summary>
-        /// Shuts down the client
+        /// Shuts down the target application.
         /// </summary>
-        private void ShutdownClient()
+        private void ShutdownTargetApplication()
         {
-            log.Info("Shutting down target application");
+            log.Info("Shutting down target application...");
             // Send exit command
             ioCommand exitCommand = new ioCommand("Exit");
             ioServer.Execute(exitCommand);
@@ -250,7 +229,7 @@ namespace Limitless.Unattended
             ioServer.CommandResultReceived -= IoServer_CommandResultReceived;
             ioServer.CommandExceptionReceived -= IoServer_CommandExceptionReceived;
             ioServer.Dispose();
-            log.Debug("Client application stopped");
+            log.Debug("Target application shut down");
         }
         
         /// <summary>
@@ -317,7 +296,7 @@ namespace Limitless.Unattended
                                 string hashString = stringBuilder.ToString();
                                 if (hashString == manifest.Package.SHA256Hash)
                                 {
-                                    log.Info("Verified intergrity of downloaded file for package {0}", manifest.Package.Name);
+                                    log.Info("Verified integrity of downloaded file for package {0}", manifest.Package.Name);
                                     downloadedPackages.Add(manifest, downloadPath);
                                 }
                                 else
@@ -330,10 +309,7 @@ namespace Limitless.Unattended
                         log.Debug("Packages ready for updating: {0}", downloadedPackages.Count);
 
                         // Get the new version
-                        target.RefreshVersions();
-                        
-                        string currentVersionDirectory = Path.GetDirectoryName(applicationPath);
-                        KeyValuePair<DateTime, int>? currentVersion = ParseVersionDirectory(currentVersionDirectory);
+                        KeyValuePair<DateTime, int>? currentVersion = target.CurrentVersion();
                         if (currentVersion == null)
                         {
                             currentVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);
@@ -341,18 +317,18 @@ namespace Limitless.Unattended
                         DateTime newDate = DateTime.Now;
                         int newCounter = 0;
                         // Check if the year-month-day strings match
-                        if (currentVersion.Value.Key.ToString("yyyyMMdd") == newDate.ToString("yyyyMMdd"))
+                        if (currentVersion.Value.Key.ToString(target.VersionPathFormat) == newDate.ToString(target.VersionPathFormat))
                         {
                             newCounter = currentVersion.Value.Value + 1;
                         }
-                        string newVersionDirectory = newDate.ToString("yyyyMMdd") + "." + newCounter;
+                        string newVersionDirectory = newDate.ToString(target.VersionPathFormat) + "." + newCounter;
                         newVersionDirectory = target.BasePath + Path.DirectorySeparatorChar + newVersionDirectory;
                         log.Debug("New version directory set as {0}", newVersionDirectory);
 
                         // Duplicate the current running version
                         try
                         {
-                            DirectoryInfo directoryInfo = new DirectoryInfo(currentVersionDirectory);
+                            DirectoryInfo directoryInfo = new DirectoryInfo(target.CurrentVersionDirectory());
                             directoryInfo.DeepCopyTo(newVersionDirectory);
                         }
                         catch (DirectoryNotFoundException ex)
@@ -392,28 +368,14 @@ namespace Limitless.Unattended
                             log.Trace("Package {0} extracted", kvp.Key.Package.Name);
                         }
 
-                        
+                        target.Update();
+                        log.Info("Target updated. New application directory is '{0}'", target.ApplicationPath);
+
                         // Update the application by checking the update policy
                         if (updateStrategy == UpdateStrategy.Restart)
                         {
-                            /// TODO: This is duplicate code, fix!
-                            // 5. Determine the latest version of the application
-                            log.Debug("Getting available directories in basepath '{0}'", basePath);
-                            string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
-                            string latestVersionDirectory = GetLatestVersionDirectory(applicationDirectories);
-                            log.Info("Latest version directory is '{0}'", latestVersionDirectory);
-
-                            // 6. Check if the target application exists in the latest verion path
-                            applicationPath = latestVersionDirectory + Path.DirectorySeparatorChar + Path.GetFileName(applicationPath);
-                            log.Info("Target application is at '{0}'", applicationPath);
-                            if (File.Exists(applicationPath) == false)
-                            {
-                                log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
-                                throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
-                            }
-                            //
-                            ShutdownClient();
-                            StartClient();
+                            ShutdownTargetApplication();
+                            StartTargetApplication();
                         }
                         else if (updateStrategy == UpdateStrategy.Prompt)
                         {
@@ -422,7 +384,6 @@ namespace Limitless.Unattended
                             ioServer.Execute(command);
                         }
                         
-
                         isUpdating = false;
                     }
                     else
@@ -474,7 +435,7 @@ namespace Limitless.Unattended
             string version = "0.0.0.0";
             try
             {
-                string currentVersionDirectory = Path.GetDirectoryName(applicationPath);
+                string currentVersionDirectory = Path.GetDirectoryName(target.ApplicationPath);
                 AssemblyName assemblyName = AssemblyName.GetAssemblyName(currentVersionDirectory + Path.DirectorySeparatorChar + updateManifest.AppPath);
                 version = assemblyName.Version.ToString();
                 log.Trace("{0} is at assembly version {1}", updateManifest.AppID, version);
@@ -552,89 +513,6 @@ namespace Limitless.Unattended
             return false;
         }
         
-        /// <summary>
-        /// Get's the latest version application path from the list of given directories.
-        /// </summary>
-        /// <param name="applicationDirectories">The list of available application paths</param>
-        /// <returns>The latest version path</returns>
-        private string GetLatestVersionDirectory(string[] applicationDirectories)
-        {
-            string latestVersionDirectory = "";
-            KeyValuePair<DateTime, int> latestVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);            
-            foreach (string applicationDirectory in applicationDirectories)
-            {
-                log.Debug("Directory in application root path: '{0}'", applicationDirectory);
-                KeyValuePair<DateTime, int>? version = ParseVersionDirectory(applicationDirectory);
-                if (version == null)
-                {
-                    log.Debug("Directory '{0}' does not conform to update folder specifications", applicationDirectory);
-                    continue;
-                }
-
-                if (version.Value.Key > latestVersion.Key)
-                {
-                    latestVersion = version.Value;
-                    latestVersionDirectory = applicationDirectory;
-                }
-                else if (version.Value.Key == latestVersion.Key)
-                {
-                    if (version.Value.Value > latestVersion.Value)
-                    {
-                        // Dates are the same, check counter
-                        latestVersion = version.Value;
-                        latestVersionDirectory = applicationDirectory;
-                    }
-                }
-            }
-            if (latestVersion.Key == DateTime.MinValue)
-            {
-                // No versions found
-                log.Fatal("No available version directory found.");
-                throw new NotSupportedException("No available version directory found");
-            }
-            log.Info("Latest version is '{0}.{1}'", latestVersion.Key.ToString(applicationPathDateFormat), latestVersion.Value);
-            return latestVersionDirectory;
-        }
-
-        /// <summary>
-        /// Parses directoryName and returns the KeyValuePair result or null.
-        /// </summary>
-        /// <param name="directoryName">The name of the directory to parse</param>
-        /// <returns>The parsed version information or null</returns>
-        private KeyValuePair<DateTime, int>? ParseVersionDirectory(string directoryName)
-        {
-            directoryName = directoryName.Substring(directoryName.LastIndexOf(Path.DirectorySeparatorChar));
-            directoryName = directoryName.Replace(Path.DirectorySeparatorChar.ToString(), "");
-            // Check if the path conforms to the date.counter format
-            // but first, check if there is a '.' for date.counter format
-            // The actual format is 20161231.1
-            if (directoryName.Contains(".") == true)
-            {
-                // parts[0] should be the date and parts[1] should be the counter
-                string[] parts = directoryName.Split('.');
-                if (parts.Length == 2)
-                {
-                    DateTime datePart;
-                    bool dateParsed = DateTime.TryParseExact(
-                        parts[0],
-                        applicationPathDateFormat,
-                        CultureInfo.InvariantCulture,
-                        DateTimeStyles.None,
-                        out datePart);
-                    if (dateParsed == true)
-                    {
-                        int counter;
-                        bool counterParsed = Int32.TryParse(parts[1], out counter);
-                        if (counterParsed == true)
-                        {
-                            return new KeyValuePair<DateTime, int>(datePart, counter);
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-        
         #region Event Handlers
         private void IoServer_Exited(object sender, EventArgs e)
         {
@@ -654,24 +532,8 @@ namespace Limitless.Unattended
                 bool canUpdate = (bool)e.Data;
                 if (canUpdate)
                 {
-                    /// TODO: This is duplicate code, fix!
-                    // 5. Determine the latest version of the application
-                    log.Debug("Getting available directories in basepath '{0}'", basePath);
-                    string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
-                    string latestVersionDirectory = GetLatestVersionDirectory(applicationDirectories);
-                    log.Info("Latest version directory is '{0}'", latestVersionDirectory);
-
-                    // 6. Check if the target application exists in the latest verion path
-                    applicationPath = latestVersionDirectory + Path.DirectorySeparatorChar + Path.GetFileName(applicationPath);
-                    log.Info("Target application is at '{0}'", applicationPath);
-                    if (File.Exists(applicationPath) == false)
-                    {
-                        log.Fatal("Target application '{0}' does not exist or cannot be read from", applicationPath);
-                        throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
-                    }
-                    //
-                    ShutdownClient();
-                    StartClient();
+                    ShutdownTargetApplication();
+                    StartTargetApplication();
                 }
             }
         }
