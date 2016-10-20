@@ -79,6 +79,7 @@
     <Compile Include="Structs\OmahaApp.cs" />
     <Compile Include="Structs\OmahaResponse.cs" />
     <Compile Include="Structs\OmahaRequest.cs" />
+    <Compile Include="Structs\Target.cs" />
     <Compile Include="Structs\UpdateManifest.cs" />
     <Compile Include="Unattended.cs" />
   </ItemGroup>

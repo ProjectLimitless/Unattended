@@ -28,8 +28,8 @@ using Limitless.ioRPC;
 using Limitless.ioRPC.Structs;
 using Limitless.Unattended.Enums;
 using Limitless.Unattended.Structs;
-using Limitless.Unattended.Configuration;
 using Limitless.Unattended.Extensions;
+using Limitless.Unattended.Configuration;
 
 namespace Limitless.Unattended
 {
@@ -60,33 +60,21 @@ namespace Limitless.Unattended
         /// </summary>
         private string updateInterval;
         /// <summary>
-        /// Flag to check if we are currently in update state.
-        /// </summary>
-        private volatile bool isUpdating;
-        /// <summary>
-        /// Absolute path to the target application's root path.
-        /// </summary>
-        private string basePath;
-        /// <summary>
-        /// The target application.
-        /// </summary>
-        private string applicationPath;
-        /// <summary>
-        /// Parameters to pass to the target application.
-        /// </summary>
-        private string applicationParameters;
-        /// <summary>
         /// Collection of the updates to check at the interval.
         /// </summary>
         private List<UpdateManifest> updateManifests;
+        /// <summary>
+        /// Flag to check if we are currently in update state.
+        /// </summary>
+        private volatile bool isUpdating;
         /// <summary>
         /// ioRPC server instance.
         /// </summary>
         private Server ioServer;
         /// <summary>
-        /// Defines the date path format for application directories. Defaults to yyyyMMdd
+        /// The target application.
         /// </summary>
-        private string applicationPathDateFormat;
+        private Target target;
 
         /// <summary>
         /// Default constructor.
@@ -112,7 +100,6 @@ namespace Limitless.Unattended
         /// <param name="settings">The settings to create the configuration from</param>
         private void setup(UnattendedSection settings)
         {
-            applicationPathDateFormat = "yyyyMMdd";
             updateManifests = new List<UpdateManifest>();
 
             log = LogManager.GetCurrentClassLogger();
@@ -144,15 +131,9 @@ namespace Limitless.Unattended
                 updateInterval = UpdateInterval.Default;
             }
             log.Info("Update interval set as '{0}'", updateInterval);
-
-            // Check base path
-            basePath = Path.GetFullPath(settings.Target.BasePath);
-            if (Directory.Exists(basePath) == false)
-            {
-                log.Fatal("Application root directory does not exist at '{0}'", basePath);
-                throw new IOException("Application root directory does not exist at " + basePath);
-            }
-
+            
+            target = new Target(settings.Target);
+            
             // Determine the latest version of the application
             log.Debug("Getting available directories in basepath '{0}'", basePath);
             string[] applicationDirectories = Directory.GetDirectories(basePath, "*", SearchOption.TopDirectoryOnly);
@@ -168,12 +149,6 @@ namespace Limitless.Unattended
                 throw new IOException("Target application does not exist or cannot be read from: " + applicationPath);
             }
             
-            applicationParameters = "";
-            if (settings.Target.Parameters != null)
-            {
-                applicationParameters = settings.Target.Parameters;
-            }
-
             // Load / Parse configs
             string[] configFiles = Directory.GetFiles(absoluteConfigPath, "*.uum", SearchOption.AllDirectories);
             foreach (string file in configFiles)
@@ -186,6 +161,14 @@ namespace Limitless.Unattended
                 }
             }
             log.Info("Loaded {0} update manifest{1}", updateManifests.Count, (updateManifests.Count == 1 ? "" : "s"));
+
+            //TODO
+            // Commonly used with regards to target needs grouping
+            // latest application directory
+            // current version directory?
+            // latest version
+            // refresh the latest version and directory
+            // target included?
         }
 
         /// <summary>
@@ -239,8 +222,8 @@ namespace Limitless.Unattended
             log.Info("Starting target application...");
             // Setup parameters for ioRPC
             ProcessStartInfo processInfo = new ProcessStartInfo();
-            processInfo.FileName = applicationPath;
-            processInfo.Arguments = applicationParameters;
+            processInfo.FileName = target.ApplicationPath;
+            processInfo.Arguments = target.ApplicationParameters;
             
             ioServer = new Server(processInfo);
             // Add event handlers
@@ -290,7 +273,7 @@ namespace Limitless.Unattended
                         log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
 
                         // Check if the update directory exists, if so, delete the it and its contents
-                        string updatePath = basePath + Path.DirectorySeparatorChar + "temp";
+                        string updatePath = target.BasePath + Path.DirectorySeparatorChar + "temp";
                         if (Directory.Exists(updatePath))
                         {
                             Directory.Delete(updatePath, true);
@@ -347,6 +330,8 @@ namespace Limitless.Unattended
                         log.Debug("Packages ready for updating: {0}", downloadedPackages.Count);
 
                         // Get the new version
+                        target.RefreshVersions();
+                        
                         string currentVersionDirectory = Path.GetDirectoryName(applicationPath);
                         KeyValuePair<DateTime, int>? currentVersion = ParseVersionDirectory(currentVersionDirectory);
                         if (currentVersion == null)
@@ -361,7 +346,7 @@ namespace Limitless.Unattended
                             newCounter = currentVersion.Value.Value + 1;
                         }
                         string newVersionDirectory = newDate.ToString("yyyyMMdd") + "." + newCounter;
-                        newVersionDirectory = basePath + Path.DirectorySeparatorChar + newVersionDirectory;
+                        newVersionDirectory = target.BasePath + Path.DirectorySeparatorChar + newVersionDirectory;
                         log.Debug("New version directory set as {0}", newVersionDirectory);
 
                         // Duplicate the current running version
