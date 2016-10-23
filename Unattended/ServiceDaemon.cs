@@ -26,7 +26,7 @@ namespace Limitless.Unattended
             UnattendedSection settings = (UnattendedSection)(dynamic)ConfigurationManager.GetSection("unattended");
             Unattended runner = new Unattended(settings);
 
-            runner.Start();
+            runner.Run();
 
             Console.WriteLine("Press <enter> to continue...");
             Console.ReadLine();            

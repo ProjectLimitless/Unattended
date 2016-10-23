@@ -33,12 +33,12 @@ using Limitless.Unattended.Configuration;
 namespace Limitless.Unattended
 {
     /// <summary>
-    /// Unattended core, runs the update lifecycle.
+    /// Unattended core, runs the update lifecycle and executes the target.
     /// </summary>
-    public class Unattended
+    public class Unattended : IDisposable
     {
         /// <summary>
-        /// Lock for syncing.
+        /// Lock for allowing only one update at a time.
         /// </summary>
         private static readonly object syncLock = new object();
 
@@ -49,7 +49,7 @@ namespace Limitless.Unattended
         /// <summary>
         /// The installed client ID.
         /// </summary>
-        private string clientId;
+        private string clientID;
         /// <summary>
         /// The configured and validated update strategy.
         /// </summary>
@@ -104,7 +104,7 @@ namespace Limitless.Unattended
             log = LogManager.GetCurrentClassLogger();
             log.Info("Reading Update configurations...");
 
-            clientId = settings.ClientID;
+            clientID = settings.ClientID;
 
             string absoluteConfigPath = Path.GetFullPath(settings.ConfigurationDirectory);
             log.Info("Path to check for configs '{0}'", absoluteConfigPath);
@@ -151,9 +151,9 @@ namespace Limitless.Unattended
         }
 
         /// <summary>
-        /// Launch the target application 
+        /// Main application loop.
         /// </summary>
-        public void Start()
+        public void Run()
         {
             StartTargetApplication();
 
@@ -171,15 +171,6 @@ namespace Limitless.Unattended
             }
             log.Info("Task created to check for updates");
             
-            // Run the loop
-            Run();
-        }
-
-        /// <summary>
-        /// Main application loop.
-        /// </summary>
-        private void Run()
-        {
             log.Info("Start main loop...");
             while (Console.KeyAvailable == false)
             {
@@ -251,7 +242,7 @@ namespace Limitless.Unattended
                     {
                         log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
 
-                        // Check if the update directory exists, if so, delete the it and its contents
+                        // Check if the update directory exists, if so, delete it and its contents
                         string updatePath = target.BasePath + Path.DirectorySeparatorChar + "temp";
                         if (Directory.Exists(updatePath))
                         {
@@ -328,8 +319,8 @@ namespace Limitless.Unattended
                         // Duplicate the current running version
                         try
                         {
-                            DirectoryInfo directoryInfo = new DirectoryInfo(target.CurrentVersionDirectory());
-                            directoryInfo.DeepCopyTo(newVersionDirectory);
+                            DirectoryInfo currentVersionDirectory = new DirectoryInfo(target.CurrentVersionDirectory());
+                            currentVersionDirectory.DeepCopyTo(newVersionDirectory);
                         }
                         catch (DirectoryNotFoundException ex)
                         {
@@ -367,7 +358,7 @@ namespace Limitless.Unattended
                             }
                             log.Trace("Package {0} extracted", kvp.Key.Package.Name);
                         }
-
+                        // Refresh the latest version information
                         target.Update();
                         log.Info("Target updated. New application directory is '{0}'", target.ApplicationPath);
 
@@ -380,6 +371,7 @@ namespace Limitless.Unattended
                         else if (updateStrategy == UpdateStrategy.Prompt)
                         {
                             // if prompt, query and set state
+                            // TODO: set state
                             ioCommand command = new ioCommand("CanUpdate");
                             ioServer.Execute(command);
                         }
@@ -448,7 +440,7 @@ namespace Limitless.Unattended
             
             // Create the data to send to the server
             OmahaRequest request = new OmahaRequest();
-            request.Application.ClientID = clientId;
+            request.Application.ClientID = clientID;
             request.Application.ID = updateManifest.AppID;
             request.Application.Version = version;
             request.Application.Event.EventType = OmahaEventType.UpdateCheck;
@@ -527,7 +519,7 @@ namespace Limitless.Unattended
         private void IoServer_CommandResultReceived(object sender, ioRPC.Events.ioEventArgs e)
         {
             log.Info("ioRPC - Client Result: '{0} - {1}'", e.CommandName, e.Data);
-            if (e.CommandName == "CanUpdate")
+            if (e.CommandName == "CanUpdate" && e.Data != null)
             {
                 bool canUpdate = (bool)e.Data;
                 if (canUpdate)
@@ -538,5 +530,33 @@ namespace Limitless.Unattended
             }
         }
         #endregion
+
+        #region IDisposable Support
+        private bool disposedValue = false; // To detect redundant calls
+
+        /// <summary>
+        /// Clean up the ioServer.
+        /// </summary>
+        /// <param name="disposing">clean up managed and unmanaged resources</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    ioServer.Dispose();
+                }
+                disposedValue = true;
+            }
+        }
+        /// <summary>
+        /// Dispose for the disposable pattern.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+        #endregion
+
     }
 }
