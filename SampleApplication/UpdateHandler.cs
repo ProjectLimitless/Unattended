@@ -16,28 +16,39 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Limitless.ioRPC.Interfaces;
 
 namespace SampleApplication
 {
     /// <summary>
     /// Sample handler for the update.
     /// </summary>
-    public class UpdateHandler
+    public class UpdateHandler : IRPCAsyncHandler
     {
-        public bool CanUpdate()
+        private Action<string, object> asyncCallback;
+
+        public void CanUpdate()
         {
-            Thread.Sleep(10000);
-            return true;
+            Task.Run(() =>
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(20));
+                asyncCallback("CanUpdate", true);
+            });
         }
 
         public string Ping()
         {
-            return "Pong A";
+            return "Pong Version 1.0.0.0";
         }
 
         public void Exit()
         {
             Environment.Exit(0);
+        }
+
+        public void SetAsyncCallback(Action<string, object> asyncCallback)
+        {
+            this.asyncCallback = asyncCallback;
         }
     }
 }

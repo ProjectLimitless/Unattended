@@ -32,8 +32,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Limitless.ioRPC, Version=1.0.0.36, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Limitless.ioRPC.1.0.0.36\lib\net45\Limitless.ioRPC.dll</HintPath>
+    <Reference Include="Limitless.ioRPC, Version=1.0.0.38, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Limitless.ioRPC.1.0.0.38\lib\net45\Limitless.ioRPC.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
