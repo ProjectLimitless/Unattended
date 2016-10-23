@@ -16,6 +16,7 @@ using Limitless.Unattended.Configuration;
 using System.Collections.Generic;
 using System;
 using System.Globalization;
+using System.Linq;
 
 namespace Limitless.Unattended.Structs
 {
@@ -110,6 +111,40 @@ namespace Limitless.Unattended.Structs
         }
 
         /// <summary>
+        /// Gets the previous version directory.
+        /// </summary>
+        /// <returns>The previous version available</returns>
+        public string PreviousVersionDirectory()
+        {
+            string[] applicationDirectories = Directory.GetDirectories(BasePath, "*", SearchOption.TopDirectoryOnly);
+
+            SortedList<string, string> versions = new SortedList<string, string>();
+            foreach (string applicationDirectory in applicationDirectories)
+            {
+                KeyValuePair<DateTime, int>? version = ParseVersionDirectory(applicationDirectory);
+                if (version == null)
+                {
+                    // Directory does not conform to update folder specifications
+                    continue;
+                }
+
+                versions.Add(version.Value.Key + "." + version.Value.Value, applicationDirectory);
+            }
+
+            // Work backwards until we find the 2nd to last version
+            string latestVersionDirectory = this.LatestVersionDirectory();
+            for (int i = (versions.Count - 1); i >= 0; i--)
+            {
+                if (versions.ElementAt(i).Value != latestVersionDirectory)
+                {
+                    return versions.ElementAt(i).Value;
+                }
+            }
+            
+            return "";
+        }
+
+        /// <summary>
         /// Gets the current version's directory.
         /// </summary>
         /// <returns>The full path to the current version</returns>
@@ -128,12 +163,38 @@ namespace Limitless.Unattended.Structs
         }
 
         /// <summary>
+        /// Get the latest version based on the directory.
+        /// </summary>
+        /// <returns>The version information, or null</returns>
+        public KeyValuePair<DateTime, int>? LatestVersion()
+        {
+            return ParseVersionDirectory(LatestVersionDirectory());
+        }
+
+        /// <summary>
         /// Rechecks versions to update to the latest executable.
         /// </summary>
         public void Update()
         {
             // Check if the target application exists in the latest verion path
             ApplicationPath = LatestVersionDirectory() + Path.DirectorySeparatorChar + ApplicationFilename;
+            if (File.Exists(ApplicationPath) == false)
+            {
+                throw new IOException("Target application does not exist or cannot be read from: " + ApplicationPath);
+            }
+        }
+
+        /// <summary>
+        /// Set paths to the previous version.
+        /// </summary>
+        public void Rollback()
+        {
+            if (PreviousVersionDirectory() == CurrentVersionDirectory())
+            {
+                throw new InvalidProgramException("Previous version is the same as the current version. Rollback not possible.");
+            }
+
+            ApplicationPath = PreviousVersionDirectory() + Path.DirectorySeparatorChar + ApplicationFilename;
             if (File.Exists(ApplicationPath) == false)
             {
                 throw new IOException("Target application does not exist or cannot be read from: " + ApplicationPath);

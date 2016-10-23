@@ -10,6 +10,7 @@
 * You should have received a copy of the Apache License Version 2.0 with
 * Unattended. If not, see http://www.apache.org/licenses/LICENSE-2.0.
 */
+
 using System;
 using System.IO;
 using System.Net;
@@ -40,7 +41,7 @@ namespace Limitless.Unattended
         /// <summary>
         /// Lock for allowing only one update at a time.
         /// </summary>
-        private static readonly object syncLock = new object();
+        private static readonly object updateLock = new object();
 
         /// <summary>
         /// NLog logger.
@@ -63,10 +64,6 @@ namespace Limitless.Unattended
         /// </summary>
         private List<UpdateManifest> updateManifests;
         /// <summary>
-        /// Flag to check if we are currently in update state.
-        /// </summary>
-        private volatile bool isUpdating;
-        /// <summary>
         /// ioRPC server instance.
         /// </summary>
         private Server ioServer;
@@ -74,6 +71,10 @@ namespace Limitless.Unattended
         /// The target application.
         /// </summary>
         private Target target;
+        /// <summary>
+        /// Flag when client is available
+        /// </summary>
+        private bool clientAvailable;
 
         /// <summary>
         /// Default constructor.
@@ -132,10 +133,10 @@ namespace Limitless.Unattended
             }
             else updateInterval = settings.Updates.Interval;
             log.Info("Update interval set as '{0}'", updateInterval);
-            
+
             target = new Target(settings.Target);
             log.Info("Latest version directory is '{0}'", target.LatestVersionDirectory());
-            
+
             // Load / Parse configs
             string[] configFiles = Directory.GetFiles(absoluteConfigPath, "*.uum", SearchOption.AllDirectories);
             foreach (string file in configFiles)
@@ -170,13 +171,20 @@ namespace Limitless.Unattended
                 PeriodicTask.Run(ProcessUpdates, TimeSpan.FromHours(1));
             }
             log.Info("Task created to check for updates");
-            
+
             log.Info("Start main loop...");
             while (Console.KeyAvailable == false)
             {
-                log.Debug("Loop update");
-                ioCommand pingCommand = new ioCommand("Ping");
-                ioServer.Execute(pingCommand);
+                if (clientAvailable == true)
+                {
+                    log.Debug("Loop update with ping");
+                    ioCommand pingCommand = new ioCommand("Ping");
+                    ioServer.Execute(pingCommand);
+                }
+                else
+                {
+                    log.Debug("Loop update without ping");
+                }
                 Thread.Sleep(1000);
             }
 
@@ -192,17 +200,31 @@ namespace Limitless.Unattended
             log.Info("Starting target application...");
             // Setup parameters for ioRPC
             ProcessStartInfo processInfo = new ProcessStartInfo();
+            //processInfo.FileName = target.ApplicationPath;
             processInfo.FileName = target.ApplicationPath;
             processInfo.Arguments = target.ApplicationParameters;
-            
+
             ioServer = new Server(processInfo);
             // Add event handlers
             ioServer.CommandResultReceived += IoServer_CommandResultReceived;
             ioServer.CommandExceptionReceived += IoServer_CommandExceptionReceived;
             ioServer.Exited += IoServer_Exited;
+
             // Start the server
-            ioServer.Start();
+            try
+            {
+                ioServer.Start();
+            }
+            catch (Exception ex)
+            {
+                log.Error("Unable to start target application: '{0}' ({1})", ex.Message, target.ApplicationPath);
+                // Try the previous version
+                target.Rollback();
+                log.Warn("New version set to '{0}'", target.ApplicationPath);
+                StartTargetApplication();
+            }
             log.Debug("Target application started");
+            clientAvailable = true;
         }
 
         /// <summary>
@@ -210,6 +232,7 @@ namespace Limitless.Unattended
         /// </summary>
         private void ShutdownTargetApplication()
         {
+            clientAvailable = false;
             log.Info("Shutting down target application...");
             // Send exit command
             ioCommand exitCommand = new ioCommand("Exit");
@@ -222,7 +245,7 @@ namespace Limitless.Unattended
             ioServer.Dispose();
             log.Debug("Target application shut down");
         }
-        
+
         /// <summary>
         /// Check for updates, download and apply them if available
         /// </summary>
@@ -230,169 +253,153 @@ namespace Limitless.Unattended
         {
             // Not really needed as the task waits for the previous one
             // to complete before firing the delay. But rather be safe.
-            lock (syncLock)
+            lock (updateLock)
             {
-                if (isUpdating == false)
+                List<OmahaManifest> omahaManifests;
+                omahaManifests = GetAvailableUpdates();
+                if (omahaManifests.Count > 0)
                 {
-                    isUpdating = true;
+                    log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
 
-                    List<OmahaManifest> omahaManifests;
-                    omahaManifests = GetAvailableUpdates();
-                    if (omahaManifests.Count > 0)
+                    // Check if the update directory exists, if so, delete it and its contents
+                    string updatePath = target.BasePath + Path.DirectorySeparatorChar + "temp";
+                    if (Directory.Exists(updatePath))
                     {
-                        log.Info("{0} update{1} available", omahaManifests.Count, (omahaManifests.Count == 1 ? "" : "s"));
+                        Directory.Delete(updatePath, true);
+                    }
+                    DirectoryInfo dir = Directory.CreateDirectory(updatePath);
+                    Dictionary<OmahaManifest, string> downloadedPackages = new Dictionary<OmahaManifest, string>();
+                    // Download the updates
+                    foreach (OmahaManifest manifest in omahaManifests)
+                    {
+                        string downloadPath = updatePath + Path.DirectorySeparatorChar + manifest.Package.Name;
+                        log.Info("Downloading update for {0} (Size {1} MB) from '{2}'", manifest.Package.Name, ((double)(manifest.Package.SizeInBytes) / 1024.00 / 1024.00).ToString("F5"), manifest.Url.Codebase);
 
-                        // Check if the update directory exists, if so, delete it and its contents
-                        string updatePath = target.BasePath + Path.DirectorySeparatorChar + "temp";
-                        if (Directory.Exists(updatePath))
-                        {
-                            Directory.Delete(updatePath, true);
-                        }
-                        DirectoryInfo dir = Directory.CreateDirectory(updatePath);
-                        Dictionary<OmahaManifest, string> downloadedPackages = new Dictionary<OmahaManifest, string>();
-                        // Download the updates
-                        foreach (OmahaManifest manifest in omahaManifests)
-                        {
-                            string downloadPath = updatePath + Path.DirectorySeparatorChar + manifest.Package.Name;
-                            log.Info("Downloading update for {0} (Size {1} MB) from '{2}'", manifest.Package.Name, ((double)(manifest.Package.SizeInBytes) / 1024.00 / 1024.00).ToString("F5"), manifest.Url.Codebase);
-
-                            WebClient webClient = new WebClient();
-                            try
-                            {
-                                webClient.DownloadFile(manifest.Url.Codebase, downloadPath);
-                            }
-                            catch (WebException ex)
-                            {
-                                log.Warn("Download failed for {0} from '{1}': {2} ({3}). Will be retried at next interval.", 
-                                    manifest.Package.Name, 
-                                    manifest.Url.Codebase,
-                                    ex.Status,
-                                    ex.Message);
-                                if (ex.InnerException != null)
-                                {
-                                    log.Warn("Download failed detail: {0}", ex.InnerException.Message);
-                                }
-                            }
-                            log.Info("Download completed for {0}. Checking integrity.", manifest.Package.Name);
-                            SHA256Managed sha = new SHA256Managed();
-                            using (FileStream fileStream = new FileStream(downloadPath, FileMode.Open))
-                            {
-                                byte[] hashBytes = sha.ComputeHash(fileStream);
-                                // Get the string of the hash
-                                StringBuilder stringBuilder = new StringBuilder();
-                                foreach (byte b in hashBytes)
-                                {
-                                    stringBuilder.AppendFormat("{0:x2}", b);
-                                }
-                                string hashString = stringBuilder.ToString();
-                                if (hashString == manifest.Package.SHA256Hash)
-                                {
-                                    log.Info("Verified integrity of downloaded file for package {0}", manifest.Package.Name);
-                                    downloadedPackages.Add(manifest, downloadPath);
-                                }
-                                else
-                                {
-                                    log.Error("Unable to verify integrity of downloaded file for package {0}. Download will be discarded and retried at next interval.", manifest.Package.Name);
-                                }
-                            }
-                        }
-
-                        log.Debug("Packages ready for updating: {0}", downloadedPackages.Count);
-
-                        // Get the new version
-                        KeyValuePair<DateTime, int>? currentVersion = target.CurrentVersion();
-                        if (currentVersion == null)
-                        {
-                            currentVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);
-                        }
-                        DateTime newDate = DateTime.Now;
-                        int newCounter = 0;
-                        // Check if the year-month-day strings match
-                        if (currentVersion.Value.Key.ToString(target.VersionPathFormat) == newDate.ToString(target.VersionPathFormat))
-                        {
-                            newCounter = currentVersion.Value.Value + 1;
-                        }
-                        string newVersionDirectory = newDate.ToString(target.VersionPathFormat) + "." + newCounter;
-                        newVersionDirectory = target.BasePath + Path.DirectorySeparatorChar + newVersionDirectory;
-                        log.Debug("New version directory set as {0}", newVersionDirectory);
-
-                        // Duplicate the current running version
+                        WebClient webClient = new WebClient();
                         try
                         {
-                            DirectoryInfo currentVersionDirectory = new DirectoryInfo(target.CurrentVersionDirectory());
-                            currentVersionDirectory.DeepCopyTo(newVersionDirectory);
+                            webClient.DownloadFile(manifest.Url.Codebase, downloadPath);
                         }
-                        catch (DirectoryNotFoundException ex)
+                        catch (WebException ex)
                         {
-                            log.Error("Unable to create new version: {0}", ex.Message);
-                            isUpdating = false;
-                            return;
-                        }
-
-                        // Extract the packages into the new version directory
-                        foreach (KeyValuePair<OmahaManifest, string> kvp in downloadedPackages)
-                        {
-                            log.Trace("Extracting package {0}...", kvp.Key.Package.Name);
-                            try
+                            log.Warn("Download failed for {0} from '{1}': {2} ({3}). Will be retried at next interval.",
+                                manifest.Package.Name,
+                                manifest.Url.Codebase,
+                                ex.Status,
+                                ex.Message);
+                            if (ex.InnerException != null)
                             {
-                                // Extract and overwrite
-                                using(ZipArchive archive = ZipFile.OpenRead(kvp.Value))
-                                { 
-                                    foreach (ZipArchiveEntry entry in archive.Entries)
+                                log.Warn("Download failed detail: {0}", ex.InnerException.Message);
+                            }
+                        }
+                        log.Info("Download completed for {0}. Checking integrity.", manifest.Package.Name);
+                        SHA256Managed sha = new SHA256Managed();
+                        using (FileStream fileStream = new FileStream(downloadPath, FileMode.Open))
+                        {
+                            byte[] hashBytes = sha.ComputeHash(fileStream);
+                            // Get the string of the hash
+                            StringBuilder stringBuilder = new StringBuilder();
+                            foreach (byte b in hashBytes)
+                            {
+                                stringBuilder.AppendFormat("{0:x2}", b);
+                            }
+                            string hashString = stringBuilder.ToString();
+                            if (hashString == manifest.Package.SHA256Hash)
+                            {
+                                log.Info("Verified integrity of downloaded file for package {0}", manifest.Package.Name);
+                                downloadedPackages.Add(manifest, downloadPath);
+                            }
+                            else
+                            {
+                                log.Error("Unable to verify integrity of downloaded file for package {0}. Download will be discarded and retried at next interval.", manifest.Package.Name);
+                            }
+                        }
+                    }
+
+                    log.Debug("Packages ready for updating: {0}", downloadedPackages.Count);
+
+                    // Get the new version
+                    KeyValuePair<DateTime, int>? latestVersion = target.LatestVersion();
+                    if (latestVersion == null)
+                    {
+                        latestVersion = new KeyValuePair<DateTime, int>(DateTime.MinValue, 0);
+                    }
+                    DateTime newDate = DateTime.Now;
+                    int newCounter = 0;
+                    // Check if the year-month-day strings match
+                    if (latestVersion.Value.Key.ToString(target.VersionPathFormat) == newDate.ToString(target.VersionPathFormat))
+                    {
+                        newCounter = latestVersion.Value.Value + 1;
+                    }
+                    string newVersionDirectory = newDate.ToString(target.VersionPathFormat) + "." + newCounter;
+                    newVersionDirectory = target.BasePath + Path.DirectorySeparatorChar + newVersionDirectory;
+                    log.Debug("New version directory set as {0}", newVersionDirectory);
+
+                    // Duplicate the current running version
+                    try
+                    {
+                        DirectoryInfo currentVersionDirectory = new DirectoryInfo(target.CurrentVersionDirectory());
+                        currentVersionDirectory.DeepCopyTo(newVersionDirectory);
+                    }
+                    catch (DirectoryNotFoundException ex)
+                    {
+                        log.Error("Unable to create new version: {0}", ex.Message);
+                        return;
+                    }
+
+                    // Extract the packages into the new version directory
+                    foreach (KeyValuePair<OmahaManifest, string> kvp in downloadedPackages)
+                    {
+                        log.Trace("Extracting package {0}...", kvp.Key.Package.Name);
+                        try
+                        {
+                            // Extract and overwrite
+                            using (ZipArchive archive = ZipFile.OpenRead(kvp.Value))
+                            {
+                                foreach (ZipArchiveEntry entry in archive.Entries)
+                                {
+                                    if (entry.Name == "" && entry.FullName != "" && entry.Length == 0)
                                     {
-                                        if (entry.Name == "" && entry.FullName != "" && entry.Length == 0)
-                                        {
-                                            Directory.CreateDirectory(newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName);
-                                        }
-                                        else
-                                        {
-                                            ZipFileExtensions.ExtractToFile(entry, newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName, true);
-                                        }
+                                        Directory.CreateDirectory(newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName);
+                                    }
+                                    else
+                                    {
+                                        ZipFileExtensions.ExtractToFile(entry, newVersionDirectory + Path.DirectorySeparatorChar + entry.FullName, true);
                                     }
                                 }
                             }
-                            catch (Exception ex)
-                            {
-                                log.Warn("Unable to extract package ({0}) to new version directory {1}: {2}", kvp.Key.Package.Name, newVersionDirectory, ex.Message);
-                                continue;
-                            }
-                            log.Trace("Package {0} extracted", kvp.Key.Package.Name);
                         }
-                        // Refresh the latest version information
-                        target.Update();
-                        log.Info("Target updated. New application directory is '{0}'", target.ApplicationPath);
-
-                        // Update the application by checking the update policy
-                        if (updateStrategy == UpdateStrategy.Restart)
+                        catch (Exception ex)
                         {
-                            ShutdownTargetApplication();
-                            StartTargetApplication();
+                            log.Warn("Unable to extract package ({0}) to new version directory {1}: {2}", kvp.Key.Package.Name, newVersionDirectory, ex.Message);
+                            continue;
                         }
-                        else if (updateStrategy == UpdateStrategy.Prompt)
-                        {
-                            // if prompt, query and set state
-                            // TODO: set state
-                            ioCommand command = new ioCommand("CanUpdate");
-                            ioServer.Execute(command);
-                        }
-                        
-                        isUpdating = false;
+                        log.Trace("Package {0} extracted", kvp.Key.Package.Name);
                     }
-                    else
+                    // Refresh the latest version information
+                    target.Update();
+                    log.Info("Target updated. New application directory is '{0}'", target.ApplicationPath);
+
+                    // Update the application by checking the update policy
+                    if (updateStrategy == UpdateStrategy.Restart)
                     {
-                        log.Debug("No updates are available at this time");
-                        isUpdating = false;
+                        ShutdownTargetApplication();
+                        StartTargetApplication();
+                    }
+                    else if (updateStrategy == UpdateStrategy.Prompt)
+                    {
+                        // if prompt, query the main application
+                        ioCommand command = new ioCommand("CanUpdate");
+                        ioServer.Execute(command);
                     }
                 }
                 else
                 {
-                    // Do nothing
-                    log.Trace("Update is already in progress");
-                    return;
-                }    
+                    log.Debug("No updates are available at this time");
+                }
             }
         }
-        
+
         /// <summary>
         /// Check for updates for the configured modules.
         /// </summary>
@@ -437,7 +444,7 @@ namespace Limitless.Unattended
                 log.Warn("Unable to get assembly version for '{0}': {1}", updateManifest.AppID, ex.Message);
                 return false;
             }
-            
+
             // Create the data to send to the server
             OmahaRequest request = new OmahaRequest();
             request.Application.ClientID = clientID;
@@ -454,7 +461,7 @@ namespace Limitless.Unattended
                 serializer.Serialize(memoryStream, request);
                 serializedRequest = memoryStream.ToArray();
             }
-            
+
             using (var client = new WebClient())
             {
                 client.Headers.Add("User-Agent", string.Format("Limitless Unattended ({0})", version));
@@ -462,7 +469,7 @@ namespace Limitless.Unattended
                 {
                     //log.Debug("Data to be sent to update server: {0}", Encoding.UTF8.GetString(serializedRequest));
                     var response = client.UploadData(updateManifest.ServerUri, "POST", serializedRequest);
-                    
+
                     string responseString = Encoding.Default.GetString(response);
                     //log.Debug("Response from update server: {0}", responseString);
 
@@ -504,7 +511,7 @@ namespace Limitless.Unattended
             }
             return false;
         }
-        
+
         #region Event Handlers
         private void IoServer_Exited(object sender, EventArgs e)
         {
@@ -522,10 +529,19 @@ namespace Limitless.Unattended
             if (e.CommandName == "CanUpdate" && e.Data != null)
             {
                 bool canUpdate = (bool)e.Data;
-                if (canUpdate)
+                lock (updateLock)
                 {
-                    ShutdownTargetApplication();
-                    StartTargetApplication();
+                    if (canUpdate == true)
+                    {
+                        // We're allowed to update
+                        ShutdownTargetApplication();
+                        StartTargetApplication();
+                    }
+                    else
+                    {
+                        // Not allowed to update, allow the update cycle to run again
+                        // This should be better handled by the child application
+                    }
                 }
             }
         }
