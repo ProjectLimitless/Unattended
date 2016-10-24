@@ -12,40 +12,20 @@
 */
 
 using NUnit.Framework;
+using Limitless.Unattended.Structs;
 
 namespace Unattended.Test
 {
     [TestFixture]
-    public class UnattendedTest
+    public class UpdateManifestTest
     {
         [Test]
-        public void MustParseCustomConfigSection()
+        public void CanCreateFromFile()
         {
+            UpdateManifest manifest = UpdateManifest.FromFile(@"..\Unattended.Test\TestFiles\TestManifest.uum");
+            Assert.AreEqual("testapp", manifest.AppID);
+            Assert.AreEqual("TestApp.exe", manifest.AppPath);
+            Assert.AreEqual("http://unattendedserver.local", manifest.ServerUri);
         }
-
-        [Test]
-        public void MustBeValidUpdateStrategies()
-        {
-
-        }
-
-        [Test]
-        public void MustBeInvalidUpdateStrategies()
-        {
-
-        }
-
-        [Test]
-        public void MustBeValidUpdateIntervals()
-        {
-
-        }
-
-        [Test]
-        public void MustBeInvalidUpdateIntervals()
-        {
-
-        }
-
     }
 }
