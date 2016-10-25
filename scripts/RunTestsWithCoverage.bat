@@ -1,6 +1,6 @@
 @echo on
 echo Creating output directory
-mkdir ..\TestResults
+mkdir .\TestResults
 echo Installing OpenCover
 nuget install OpenCover -Version 4.6.519 -OutputDirectory tools
 echo Running NUnit tests with OpenCover coverage
