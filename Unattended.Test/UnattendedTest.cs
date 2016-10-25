@@ -64,7 +64,7 @@ namespace Unattended.Test
         [Test]
         public void MustParseTargetBase()
         {
-            Assert.AreEqual(@".\SampleApplication\bin\Debug", settings.Target.BasePath);
+            Assert.AreEqual(@".\SampleApplication\bin\Release", settings.Target.BasePath);
         }
 
         [Test]
