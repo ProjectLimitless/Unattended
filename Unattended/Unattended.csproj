@@ -32,7 +32,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\Limitless.Unattended.ServiceDaemon.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\Limitless.Unattended.xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Limitless.ioRPC, Version=1.0.0.38, Culture=neutral, processorArchitecture=MSIL">
