@@ -23,19 +23,19 @@ namespace Unattended.Test
         [Test]
         public void CanDeepCopy()
         {
-            if (Directory.Exists(@"..\Unattended.Test\TestFiles\DeepCopyTest\Destination"))
+            if (Directory.Exists(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination"))
             {
-                Directory.Delete(@"..\Unattended.Test\TestFiles\DeepCopyTest\Destination", true);
+                Directory.Delete(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination", true);
             }
 
-            DirectoryInfo directoryInfo = new DirectoryInfo(@"..\Unattended.Test\TestFiles\DeepCopyTest\Source");
-            directoryInfo.DeepCopyTo(@"..\Unattended.Test\TestFiles\DeepCopyTest\Destination");
+            DirectoryInfo directoryInfo = new DirectoryInfo(@".\Unattended.Test\TestFiles\DeepCopyTest\Source");
+            directoryInfo.DeepCopyTo(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination");
 
             // Verify file is there
-            string[] directories = Directory.GetDirectories(@"..\Unattended.Test\TestFiles\DeepCopyTest\Destination");
-            Assert.Contains(@"..\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub", directories);
-            string[] files = Directory.GetFiles(@"..\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub");
-            Assert.Contains(@"..\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub\File.txt", files);
+            string[] directories = Directory.GetDirectories(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination");
+            Assert.Contains(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub", directories);
+            string[] files = Directory.GetFiles(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub");
+            Assert.Contains(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub\File.txt", files);
         }
     }
 }

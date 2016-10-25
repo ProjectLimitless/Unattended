@@ -22,7 +22,7 @@ namespace Unattended.Test
         [Test]
         public void CanCreateFromFile()
         {
-            UpdateManifest manifest = UpdateManifest.FromFile(@"..\Unattended.Test\TestFiles\TestManifest.uum");
+            UpdateManifest manifest = UpdateManifest.FromFile(@".\Unattended.Test\TestFiles\TestManifest.uum");
             Assert.AreEqual("testapp", manifest.AppID);
             Assert.AreEqual("TestApp.exe", manifest.AppPath);
             Assert.AreEqual("http://unattendedserver.local", manifest.ServerUri);

@@ -46,7 +46,7 @@ namespace Unattended.Test
         [Test]
         public void MustParseConfigurationDirectory()
         {
-           Assert.AreEqual(@"..\Unattended.Test\TestFiles", settings.ConfigurationDirectory);
+           Assert.AreEqual(@".\Unattended.Test\TestFiles", settings.ConfigurationDirectory);
         }
 
         [Test]
@@ -64,7 +64,7 @@ namespace Unattended.Test
         [Test]
         public void MustParseTargetBase()
         {
-            Assert.AreEqual(@"..\SampleApplication\bin\Debug", settings.Target.BasePath);
+            Assert.AreEqual(@".\SampleApplication\bin\Debug", settings.Target.BasePath);
         }
 
         [Test]

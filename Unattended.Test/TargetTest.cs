@@ -31,7 +31,7 @@ namespace Unattended.Test
         public void Setup()
         {
             section = new TargetSection();
-            section.BasePath = @"..\Unattended.Test\TestFiles";
+            section.BasePath = @".\Unattended.Test\TestFiles";
             section.Filename = "SampleFile.txt";
             section.Parameters = "-test true";
             target = new Target(section);
@@ -115,8 +115,8 @@ namespace Unattended.Test
             TargetSection testSection = section;
             Target testTarget = target;
             // Create a new 'updated' directory to ensure update picks the new one
-            Directory.CreateDirectory(@"..\Unattended.Test\TestFiles\21000102.1");
-            FileStream fs = File.Create(@"..\Unattended.Test\TestFiles\21000102.1\SampleFile.txt");
+            Directory.CreateDirectory(@".\Unattended.Test\TestFiles\21000102.1");
+            FileStream fs = File.Create(@".\Unattended.Test\TestFiles\21000102.1\SampleFile.txt");
             fs.Flush();
             fs.Close();
             testTarget.Update();
@@ -134,9 +134,9 @@ namespace Unattended.Test
             Assert.AreEqual(1, version.Value.Value);
 
 
-            if (Directory.Exists(@"..\Unattended.Test\TestFiles\21000102.1"))
+            if (Directory.Exists(@".\Unattended.Test\TestFiles\21000102.1"))
             {
-                Directory.Delete(@"..\Unattended.Test\TestFiles\21000102.1", true);
+                Directory.Delete(@".\Unattended.Test\TestFiles\21000102.1", true);
             }
         }
 
