@@ -64,19 +64,19 @@ namespace Unattended.Test
         [Test]
         public void MustParseTargetBase()
         {
-            Assert.AreEqual(@".\SampleApplication\bin\Release", settings.Target.BasePath);
+            Assert.AreEqual(@".\Unattended.Test\TestFiles", settings.Target.BasePath);
         }
 
         [Test]
         public void MustParseTargetFilename()
         {
-            Assert.AreEqual("SampleApplication.exe", settings.Target.Filename);
+            Assert.AreEqual("SampleFile.txt", settings.Target.Filename);
         }
 
         [Test]
         public void MustParseTargetParameters()
         {
-            Assert.AreEqual("-key -sample=value", settings.Target.Parameters);
+            Assert.AreEqual("-test true", settings.Target.Parameters);
         }
 
         [Test]

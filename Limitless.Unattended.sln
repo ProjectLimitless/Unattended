@@ -15,6 +15,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Unattended.Test", "Unattended.Test\Unattended.Test.csproj", "{03E3B74E-86BB-478B-B0A7-B77A98D62E2C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{711397AF-40FA-45BB-8521-2AD6EA3F7C57} = {711397AF-40FA-45BB-8521-2AD6EA3F7C57}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{3F09F4AF-76C0-4EE4-9099-5F7E70A91EEA}"
 	ProjectSection(SolutionItems) = preProject
