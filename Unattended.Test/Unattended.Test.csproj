@@ -53,7 +53,7 @@
     <Compile Include="DirectoryInfoExtensionTest.cs" />
     <Compile Include="UpdateManifestTest.cs" />
     <Compile Include="TargetTest.cs" />
-    <Compile Include="ConfigParseTest.cs" />
+    <Compile Include="UnattendedTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -61,12 +61,20 @@
       <SubType>Designer</SubType>
     </None>
     <None Include="packages.config" />
+    <None Include="TestFiles\TestManifest.uum" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Unattended\Unattended.csproj">
       <Project>{7bd444e8-9302-4c1c-84bb-32ef85d98cc4}</Project>
       <Name>Unattended</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="TestFiles\20160129.5\SampleFile.txt" />
+    <Content Include="TestFiles\20160201.1\SampleFile.txt" />
+    <Content Include="TestFiles\DeepCopyTest\Destination\Sub\File.txt" />
+    <Content Include="TestFiles\DeepCopyTest\Source\Sub\File.txt" />
+    <Content Include="TestFiles\SampleFile.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

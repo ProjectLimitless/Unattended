@@ -53,6 +53,12 @@ namespace Unattended.Test
         }
 
         [Test]
+        public void GetApplicationParameters()
+        {
+            Assert.AreEqual("-test true", target.ApplicationParameters);
+        }
+
+        [Test]
         public void FailBasePathCheck()
         {
             Assert.Throws(typeof(IOException), new TestDelegate(InvalidBasePathException));
@@ -101,6 +107,37 @@ namespace Unattended.Test
         {
             string previousVersionDirectory = target.PreviousVersionDirectory();
             StringAssert.Contains(@"Unattended.Test\TestFiles\20160129.5", previousVersionDirectory);
+        }
+        
+        [Test]
+        public void MustUpdateTargetPath()
+        {
+            TargetSection testSection = section;
+            Target testTarget = target;
+            // Create a new 'updated' directory to ensure update picks the new one
+            Directory.CreateDirectory(@"..\Unattended.Test\TestFiles\21000102.1");
+            FileStream fs = File.Create(@"..\Unattended.Test\TestFiles\21000102.1\SampleFile.txt");
+            fs.Flush();
+            fs.Close();
+            testTarget.Update();
+
+            // Verify the new current verion
+            KeyValuePair<DateTime, int>? version = testTarget.CurrentVersion();
+            Assert.IsNotNull(version);
+            Assert.AreEqual(DateTime.Parse("2100-01-02"), version.Value.Key);
+            Assert.AreEqual(1, version.Value.Value);
+
+            testTarget.Rollback();
+            version = testTarget.CurrentVersion();
+            Assert.IsNotNull(version);
+            Assert.AreEqual(DateTime.Parse("2016-02-01"), version.Value.Key);
+            Assert.AreEqual(1, version.Value.Value);
+
+
+            if (Directory.Exists(@"..\Unattended.Test\TestFiles\21000102.1"))
+            {
+                Directory.Delete(@"..\Unattended.Test\TestFiles\21000102.1", true);
+            }
         }
 
         void InvalidBasePathException()

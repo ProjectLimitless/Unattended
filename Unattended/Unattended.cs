@@ -75,17 +75,7 @@ namespace Limitless.Unattended
         /// Flag when client is available
         /// </summary>
         private bool clientAvailable;
-
-        /// <summary>
-        /// Default constructor.
-        /// </summary>
-        public Unattended()
-        {
-            // Create defaults
-            UnattendedSection settings = new UnattendedSection();
-            setup(settings);
-        }
-
+        
         /// <summary>
         /// Standard constructor with predefined settings.
         /// </summary>

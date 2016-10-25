@@ -1,0 +1,21 @@
+version: 0.0.0.{build}
+configuration: Release
+platform: Any CPU
+environment:
+  COVERALLS_REPO_TOKEN:
+    secure: e7yE9bqQ3IW/JZ+C7dRccZEllTLEIkHdEcWP/onnPqUatm9iTghho9KUGfad5l/N
+assembly_info:
+  patch: true
+  file: '**\AssemblyInfo.*'
+  assembly_version: '{version}'
+  assembly_file_version: '{version}'
+  assembly_informational_version: '{version}'
+before_build:
+- cmd: nuget restore
+build:
+  project: Limitless.Unattended.sln
+  verbosity: minimal
+test_script:
+- cmd: .\scripts\RunTestsWithCoverage.bat
+after_test:
+- cmd: .\scripts\SubmitCoverage.bat

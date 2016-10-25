@@ -1,0 +1,9 @@
+language: csharp
+script:
+  - xbuild /p:Configuration=Release Limitless.Unattended.sln
+before_install:
+  - sudo apt-get install nunit-console
+before_script:
+  - nuget restore Limitless.Unattended.sln
+after_script:
+  - nunit-console Unattended.Test/bin/Release/Unattended.Test.dll

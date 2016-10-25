@@ -13,12 +13,13 @@
 
 using NUnit.Framework;
 using System.Configuration;
+using Limitless.Unattended;
 using Limitless.Unattended.Configuration;
 
 namespace Unattended.Test
 {
     [TestFixture]
-    public class ConfigParseTest
+    public class UnattendedTest
     {
         UnattendedSection settings;
 
@@ -45,7 +46,7 @@ namespace Unattended.Test
         [Test]
         public void MustParseConfigurationDirectory()
         {
-           Assert.AreEqual(@"..\..\..\sample-files", settings.ConfigurationDirectory);
+           Assert.AreEqual(@"..\Unattended.Test\TestFiles", settings.ConfigurationDirectory);
         }
 
         [Test]
@@ -63,7 +64,7 @@ namespace Unattended.Test
         [Test]
         public void MustParseTargetBase()
         {
-            Assert.AreEqual(@"..\..\..\SampleApplication\bin\Debug", settings.Target.BasePath);
+            Assert.AreEqual(@"..\SampleApplication\bin\Debug", settings.Target.BasePath);
         }
 
         [Test]
@@ -79,6 +80,12 @@ namespace Unattended.Test
         }
 
         [Test]
+        public void MustParseUpdateChannel()
+        {
+            Assert.AreEqual("stable", settings.Updates.Channel);
+        }
+
+        [Test]
         public void IsValidIntervals()
         {
             Assert.IsTrue(UpdateInterval.IsValid("daily"));
@@ -90,6 +97,12 @@ namespace Unattended.Test
         {
             Assert.IsTrue(UpdateStrategy.IsValid("prompt"));
             Assert.IsTrue(UpdateStrategy.IsValid("restart"));
+        }
+
+        [Test]
+        public void CreateNewUnattended()
+        {
+            Limitless.Unattended.Unattended runner = new Limitless.Unattended.Unattended(settings);
         }
     }
 }
