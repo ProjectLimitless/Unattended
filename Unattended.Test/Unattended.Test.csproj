@@ -49,6 +49,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="OmahaTest.cs" />
+    <Compile Include="DirectoryInfoExtensionTest.cs" />
     <Compile Include="UpdateManifestTest.cs" />
     <Compile Include="TargetTest.cs" />
     <Compile Include="ConfigParseTest.cs" />

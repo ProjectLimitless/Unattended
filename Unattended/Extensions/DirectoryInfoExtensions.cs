@@ -18,7 +18,7 @@ namespace Limitless.Unattended.Extensions
     /// <summary>
     /// Defines extensions for DirectoryInfo instances.
     /// </summary>
-    internal static class DirectoryInfoExtensions
+    public static class DirectoryInfoExtensions
     {
         /// <summary>
         /// Copies this directory (and all sub-directories) to the destination directory.
