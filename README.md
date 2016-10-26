@@ -1,12 +1,14 @@
 # Unattended
 
+[![Build status](https://www.projectlimitless.io/badger/unattended/badge)](https://www.projectlimitless.io/badger/unattended)
+
 [![Coverage Status](https://coveralls.io/repos/github/ProjectLimitless/Unattended/badge.svg?branch=master)](https://coveralls.io/github/ProjectLimitless/Unattended?branch=master)
 
 A simple update library for .NET and Mono.
 
 ## Getting Started
 
-TODO
+*This library is in active development. These sections will be created soon.*
 
 ## How Unattended works
 
