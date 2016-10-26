@@ -239,7 +239,7 @@ namespace Limitless.Unattended
         /// <summary>
         /// Check for updates, download and apply them if available
         /// </summary>
-        private void ProcessUpdates()
+        public void ProcessUpdates()
         {
             // Not really needed as the task waits for the previous one
             // to complete before firing the delay. But rather be safe.

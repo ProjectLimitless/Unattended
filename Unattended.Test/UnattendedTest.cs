@@ -110,6 +110,8 @@ namespace Unattended.Test
 
             Assert.DoesNotThrow(new TestDelegate(StartClient));
             Assert.DoesNotThrow(new TestDelegate(StopClient));
+            Assert.DoesNotThrow(new TestDelegate(TestUpdates));
+            
         }
 
         void StartClient()
@@ -120,6 +122,11 @@ namespace Unattended.Test
         void StopClient()
         {
             runner.ShutdownTargetApplication();
+        }
+
+        void TestUpdates()
+        {
+            runner.ProcessUpdates();
         }
     }
 }
