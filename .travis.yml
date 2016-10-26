@@ -1,8 +1,13 @@
 language: csharp
+os:
+  - linux
+  - osx
 script:
   - xbuild /p:Configuration=Release Limitless.Unattended.sln
 before_install:
-  - sudo apt-get install nunit-console
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update       ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install mono ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; sudo apt-get install nunit-console; fi
 before_script:
   - nuget restore Limitless.Unattended.sln
 after_script:
