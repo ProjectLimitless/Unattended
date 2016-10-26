@@ -37,5 +37,16 @@ namespace Unattended.Test
             string[] files = Directory.GetFiles(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub");
             Assert.Contains(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination\Sub\File.txt", files);
         }
+
+        public void FailDeepCopy()
+        {
+            Assert.Throws(typeof(DirectoryNotFoundException), new TestDelegate(InvalidSource));
+        }
+
+        void InvalidSource()
+        {
+            DirectoryInfo directoryInfo = new DirectoryInfo(@".\Unattended.Test\TestFiles\DoesNotExist");
+            directoryInfo.DeepCopyTo(@".\Unattended.Test\TestFiles\DeepCopyTest\Destination");
+        }
     }
 }

@@ -70,12 +70,44 @@ namespace Unattended.Test
             OmahaManifest omahaManifest = omahaResponse.Application.UpdateCheck.Manifest;
             Assert.AreEqual(3.0, omahaResponse.Protocol);
             Assert.NotNull(omahaManifest);
+            Assert.AreEqual("demo-zZZuNwGqbxyrAc5p3itWadIIGSKB10pq", omahaManifest.TraceID);
             Assert.AreEqual("4fc21f834edfe576babd0f9e9eb0fe2327af9c256d7209550c9757c5e7efc47a", omahaManifest.Package.SHA256Hash);
             Assert.AreEqual("sampleapp.v1.0.0.1.zip", omahaManifest.Package.Name);
             Assert.AreEqual(2522, omahaManifest.Package.SizeInBytes);
             Assert.AreEqual("1.0.0.1", omahaManifest.Version);
             Assert.AreEqual("http://unattendedserver.local/packages/sampleapp.v1.0.0.1.zip", omahaManifest.Url.Codebase);
+        }
 
+        [Test]
+        public void CanCreateEvent()
+        {
+            OmahaEvent ev = new OmahaEvent(OmahaEventType.UpdateCheck, OmahaEventResultType.Available);
+            Assert.AreEqual(OmahaEventType.UpdateCheck, ev.EventType);
+            Assert.AreEqual(OmahaEventResultType.Available, ev.EventResult);
+        }
+
+        [Test]
+        public void CanSetAppReason()
+        {
+            OmahaApp app = new OmahaApp();
+            app.Reason = "TestReason";
+            Assert.AreEqual("TestReason", app.Reason);
+        }
+
+        [Test]
+        public void CanCreateAndSetResponseApp()
+        {
+            OmahaApp app = new OmahaApp();
+            OmahaResponse response = new OmahaResponse(app);
+            Assert.AreEqual(app, response.Application);
+        }
+
+        [Test]
+        public void CanCreateAndSetRequestApp()
+        {
+            OmahaApp app = new OmahaApp();
+            OmahaRequest request = new OmahaRequest(app);
+            Assert.AreEqual(app, request.Application);
         }
     }
 }

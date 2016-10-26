@@ -184,7 +184,7 @@ namespace Limitless.Unattended
         /// <summary>
         /// Start the target application using ioRPC
         /// </summary>
-        private void StartTargetApplication()
+        public void StartTargetApplication()
         {
             // Launch the application and attach the ioRPC
             log.Info("Starting target application...");
@@ -220,7 +220,7 @@ namespace Limitless.Unattended
         /// <summary>
         /// Shuts down the target application.
         /// </summary>
-        private void ShutdownTargetApplication()
+        public void ShutdownTargetApplication()
         {
             clientAvailable = false;
             log.Info("Shutting down target application...");

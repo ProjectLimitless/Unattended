@@ -22,6 +22,7 @@ namespace Unattended.Test
     public class UnattendedTest
     {
         UnattendedSection settings;
+        Limitless.Unattended.Unattended runner;
 
         [SetUp]
         public void Setup()
@@ -70,7 +71,7 @@ namespace Unattended.Test
         [Test]
         public void MustParseTargetFilename()
         {
-            Assert.AreEqual("SampleFile.txt", settings.Target.Filename);
+            Assert.AreEqual("SampleApplication.exe", settings.Target.Filename);
         }
 
         [Test]
@@ -90,6 +91,7 @@ namespace Unattended.Test
         {
             Assert.IsTrue(UpdateInterval.IsValid("daily"));
             Assert.IsTrue(UpdateInterval.IsValid("hourly"));
+            Assert.IsFalse(UpdateInterval.IsValid("monthly"));
         }
 
         [Test]
@@ -97,12 +99,27 @@ namespace Unattended.Test
         {
             Assert.IsTrue(UpdateStrategy.IsValid("prompt"));
             Assert.IsTrue(UpdateStrategy.IsValid("restart"));
+            Assert.IsFalse(UpdateStrategy.IsValid("nothing"));
         }
 
         [Test]
-        public void CreateNewUnattended()
+        public void CanCreateAndStart()
         {
-            Limitless.Unattended.Unattended runner = new Limitless.Unattended.Unattended(settings);
+            runner = new Limitless.Unattended.Unattended(settings);
+            Assert.NotNull(runner);
+
+            Assert.DoesNotThrow(new TestDelegate(StartClient));
+            Assert.DoesNotThrow(new TestDelegate(StopClient));
+        }
+
+        void StartClient()
+        {
+            runner.StartTargetApplication();
+        }
+
+        void StopClient()
+        {
+            runner.ShutdownTargetApplication();
         }
     }
 }

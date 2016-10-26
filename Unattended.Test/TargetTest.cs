@@ -32,7 +32,7 @@ namespace Unattended.Test
         {
             section = new TargetSection();
             section.BasePath = @".\Unattended.Test\TestFiles";
-            section.Filename = "SampleFile.txt";
+            section.Filename = "SampleApplication.exe";
             section.Parameters = "-test true";
             target = new Target(section);
         }
@@ -116,7 +116,7 @@ namespace Unattended.Test
             Target testTarget = target;
             // Create a new 'updated' directory to ensure update picks the new one
             Directory.CreateDirectory(@".\Unattended.Test\TestFiles\21000102.1");
-            FileStream fs = File.Create(@".\Unattended.Test\TestFiles\21000102.1\SampleFile.txt");
+            FileStream fs = File.Create(@".\Unattended.Test\TestFiles\21000102.1\SampleApplication.exe");
             fs.Flush();
             fs.Close();
             testTarget.Update();
